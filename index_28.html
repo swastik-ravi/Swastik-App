@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#14120E">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Swastik App</title>
+<style>
+:root{--gold:#F0B429;--gold2:#C8901A;--ink:#14120E;--cream:#FBF6EC;--mut:#B8AF9B}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;display:flex;justify-content:center;color:var(--cream);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:radial-gradient(ellipse at 50% -10%,rgba(240,180,41,.18),transparent 55%),#14120E}
+.app{width:100%;max-width:380px;padding:28px 20px 40px}
+.screen{display:none}.screen.on{display:block}
+.brand{text-align:center;margin-bottom:26px}
+.mark{display:inline-flex;flex-direction:column;align-items:center;border:2px solid var(--gold);border-radius:10px;padding:10px 22px 12px;background:rgba(240,180,41,.05)}
+.mark b{font:900 30px Georgia,serif;letter-spacing:3px;color:var(--gold)}
+.mark i{font-style:normal;margin-top:6px;font-size:13px;letter-spacing:6px;font-weight:700;color:var(--ink);background:var(--gold);padding:2px 14px;border-radius:3px}
+.tag{margin-top:12px;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#9A9280}
+.card{background:rgba(255,255,255,.03);border:1px solid rgba(240,180,41,.18);border-radius:14px;padding:22px}
+label{display:block;font-size:12px;letter-spacing:1px;text-transform:uppercase;color:var(--mut);margin:0 0 7px}
+input{width:100%;padding:14px;font-size:16px;border-radius:10px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);color:var(--cream);margin-bottom:16px;outline:none}
+input:focus{border-color:var(--gold)}
+button{font:inherit;cursor:pointer}
+.btn{width:100%;padding:15px;border:0;border-radius:12px;font-size:16px;font-weight:700;background:linear-gradient(180deg,var(--gold),var(--gold2));color:var(--ink)}
+.btn.out{background:linear-gradient(180deg,#E36A6A,#B93D3D);color:#fff}
+.btn.ghost{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.15);color:var(--mut)}
+.btn:disabled{opacity:.5}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:18px 0}
+.tile{text-align:center;padding:22px 8px;border-radius:14px;border:1px solid rgba(240,180,41,.2);background:rgba(255,255,255,.03);color:var(--gold);font-weight:700;font-size:14px}
+.tile span{display:block;font-size:30px;margin-bottom:8px}
+.tile.off{opacity:.3;filter:grayscale(1);pointer-events:none}
+.msg{min-height:18px;margin-top:12px;font-size:13px;text-align:center;color:#F08A8A}
+.pill{display:none;margin:0 0 14px;padding:9px 12px;border-radius:10px;font-size:12px;text-align:center;background:rgba(240,180,41,.1);color:var(--gold)}
+.pill.on{display:block}.pill.warn{background:rgba(214,69,69,.14);color:#F4A0A0}
+.big{font-size:24px;font-weight:700;margin-top:6px}
+.sub{font-size:13px;color:var(--mut)}
+.cap{display:inline-block;padding:10px 18px;border:1px dashed rgba(240,180,41,.4);border-radius:10px;color:var(--gold);font-size:13px;cursor:pointer;letter-spacing:0;text-transform:none;margin:0}
+#prev{display:none;max-width:130px;border-radius:10px;margin:10px auto 0}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="brand">
+    <div class="mark"><b>SWASTIK</b><i>RICE</i></div>
+    <div class="tag">Healthy Rice for Stronger India</div>
+  </div>
+
+  <div id="pill" class="pill" onclick="pillTap()"></div>
+
+  <div id="login" class="screen card">
+    <label for="u">Username</label>
+    <input id="u" placeholder="e.g. BRAJESH@466" autocapitalize="characters" autocomplete="username">
+    <label for="p">Password</label>
+    <input id="p" type="password" placeholder="Enter password" autocomplete="current-password">
+    <button class="btn" id="loginBtn" onclick="doLogin()">Login</button>
+    <div class="msg" id="loginMsg"></div>
+  </div>
+
+  <div id="home" class="screen">
+    <div class="card" style="padding:12px 14px;font-size:13px;color:#D8CBA5" id="sum"></div>
+    <h2 id="hi" style="text-align:center;color:var(--gold);margin:20px 0 2px"></h2>
+    <div class="sub" style="text-align:center">What would you like to do?</div>
+    <div class="grid">
+      <button class="tile" id="tAtt" onclick="openAtt()"><span>🕒</span>Attendance</button>
+      <div class="tile off"><span>📝</span>Order</div>
+      <div class="tile off"><span>🗺️</span>Market Visit</div>
+      <div class="tile off"><span>🧾</span>Expense</div>
+      <div class="tile off"><span>📋</span>My Orders</div>
+      <div class="tile off"><span>🗓️</span>Leave</div>
+    </div>
+    <button class="btn ghost" onclick="signOut()">Sign out</button>
+    <div class="msg" id="homeMsg"></div>
+  </div>
+
+  <div id="att" class="screen">
+    <button class="btn ghost" style="width:auto;padding:10px 16px;margin-bottom:18px" onclick="show('home');render()">← Back</button>
+    <div class="card" style="text-align:center;margin-bottom:18px">
+      <div class="sub" id="attStatus"></div>
+      <div class="big" id="attTime">--:--</div>
+    </div>
+    <div style="text-align:center;margin-bottom:16px">
+      <label class="cap" for="cam" id="camLbl">📷 Take photo</label>
+      <input id="cam" type="file" accept="image/*" capture="user" hidden onchange="onPhoto(event)">
+      <br><img id="prev" alt="">
+    </div>
+    <button class="btn" id="attBtn" onclick="attAction()" disabled>Login</button>
+    <div class="sub" id="gps" style="text-align:center;margin-top:12px">Finding your location…</div>
+    <div class="msg" id="attMsg"></div>
+  </div>
+</div>
+
+<script>
+/* ===== SETTINGS ===== */
+const API_URL = "https://script.google.com/macros/s/AKfycbxFv9zn77R22Kr1V131y7Zv9zxVDxLyahta2s2TcQj-NemUt5jGZaayAPJ_cQ4KQGIc/exec";   // the Web app link from Apps Script (…/exec)
+const WIPE_ON_ATT_LOGOUT = true;                // after Attendance Logout: upload everything, then clear the phone
+
+const $ = id => document.getElementById(id);
+const S = { session: null, busy: false, needLogin: false, err: "", coords: null, photo: null, proc: false };
+const dayKey = ts => new Date(ts).toLocaleDateString("en-CA"); // yyyy-mm-dd
+
+/* ===== PHONE STORAGE (IndexedDB): kv = profile/snapshot, outbox = entries waiting to upload ===== */
+const dbp = new Promise((res, rej) => {
+  const q = indexedDB.open("swastik", 1);
+  q.onupgradeneeded = () => { q.result.createObjectStore("kv"); q.result.createObjectStore("outbox", { keyPath: "opId" }); };
+  q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error);
+});
+const tx = (store, mode, fn) => dbp.then(db => new Promise((res, rej) => {
+  const t = db.transaction(store, mode), r = fn(t.objectStore(store));
+  t.oncomplete = () => res(r && r.result); t.onerror = () => rej(t.error);
+}));
+const kvGet = k => tx("kv", "readonly", s => s.get(k));
+const kvSet = (k, v) => tx("kv", "readwrite", s => s.put(v, k));
+const outAll = () => tx("outbox", "readonly", s => s.getAll()).then(a => (a || []).sort((x, y) => x.ts - y.ts));
+const outPut = op => tx("outbox", "readwrite", s => s.put(op));
+const outDel = id => tx("outbox", "readwrite", s => s.delete(id));
+const wipeAll = () => dbp.then(db => new Promise(res => {
+  const t = db.transaction(["kv", "outbox"], "readwrite");
+  t.objectStore("kv").clear(); t.objectStore("outbox").clear(); t.oncomplete = res;
+}));
+
+/* ===== SCREEN HELPERS ===== */
+function show(id) { document.querySelectorAll(".screen").forEach(e => e.classList.toggle("on", e.id === id)); }
+
+/* What the user sees = last server copy + entries still waiting on the phone */
+async function derive() {
+  const snap = (await kvGet("snap")) || { presentDates: [], open: null };
+  const ops = await outAll(), today = dayKey(Date.now());
+  const present = new Set(snap.presentDates);
+  let open = snap.open;
+  ops.forEach(o => {
+    if (o.type === "login") { open = { entryId: o.entryId, date: dayKey(o.ts), loginTs: o.ts }; present.add(dayKey(o.ts)); }
+    else open = null;
+  });
+  if (open && open.date !== today) open = null; // an old open session never blocks today
+  const ym = today.slice(0, 7);
+  return { open, pending: ops.length, presentCount: [...present].filter(d => d.startsWith(ym)).length };
+}
+
+async function render() {
+  if (!S.session) return;
+  const st = await derive(), pf = S.session.profile;
+  $("hi").textContent = "Welcome, " + pf.name.split(" ")[0] + "!";
+  $("sum").innerHTML = "This month: present <b style='color:var(--gold)'>" + st.presentCount + "</b> day(s)";
+  $("tAtt").classList.toggle("off", !pf.attendanceAccess);
+
+  let t = "", warn = false;
+  if (S.needLogin) { t = "🔒 Session ended. Tap here to login again — your saved entries are safe."; warn = true; }
+  else if (st.pending) t = (S.busy ? "⏫ Uploading " : "⏳ ") + st.pending + (st.pending > 1 ? " entries" : " entry") + (S.busy ? "…" : " waiting to upload") + (navigator.onLine ? "" : " (will upload when net returns)");
+  else if (!navigator.onLine) t = "📴 Offline — everything is saved on your phone";
+  if (S.err && !S.needLogin) { t += " · " + S.err; warn = true; }
+  $("pill").textContent = t;
+  $("pill").className = "pill" + (t ? " on" : "") + (warn ? " warn" : "");
+  if ($("att").classList.contains("on")) renderAtt(st);
+}
+
+function pillTap() { if (S.needLogin) show("login"); }
+
+/* ===== LOGIN (needs net once; pulls this user's data) ===== */
+async function api(body) {
+  const r = await fetch(API_URL, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(body) });
+  return r.json();
+}
+
+async function doLogin() {
+  const u = $("u").value.trim(), p = $("p").value.trim(), msg = $("loginMsg"), btn = $("loginBtn");
+  if (!u || !p) { msg.textContent = "Enter username and password."; return; }
+  btn.disabled = true; btn.textContent = "Checking…"; msg.textContent = "";
+  try {
+    const r = await api({ action: "login", username: u, password: p });
+    if (!r.ok) { msg.textContent = r.message; return; }
+    S.session = { token: r.token, exp: r.exp, profile: r.profile };
+    await kvSet("session", S.session); await kvSet("snap", r.attendance); await kvSet("holidays", r.holidays);
+    await kvSet("wipe", false); S.needLogin = false; S.err = ""; $("p").value = "";
+    if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
+    show("home"); render(); sync();
+  } catch (e) {
+    msg.textContent = "No internet. The first login of the day needs net.";
+  } finally { btn.disabled = false; btn.textContent = "Login"; }
+}
+
+/* ===== UPLOAD: send waiting entries; remove each only after the server confirms ===== */
+async function sync() {
+  if (S.busy || !S.session) return;
+  const ops = await outAll();
+  if (!ops.length) return afterSync();
+  if (!navigator.onLine) return render();
+  S.busy = true; render();
+  try {
+    const r = await api({ action: "sync", token: S.session.token, ops });
+    if (r.auth === false) S.needLogin = true;
+    else if (r.ok) {
+      for (const x of r.results) if (x.ok) await outDel(x.opId);
+      await kvSet("snap", r.attendance);
+      S.needLogin = false;
+      const bad = r.results.find(x => !x.ok); S.err = bad ? bad.message : "";
+    } else S.err = r.message || "";
+  } catch (e) { /* weak net: entries stay on the phone, retried automatically */ }
+  S.busy = false;
+  await afterSync(); render();
+}
+
+/* Clear the phone only when nothing is left waiting */
+async function afterSync() {
+  if ((await outAll()).length === 0 && (await kvGet("wipe"))) {
+    await wipeAll(); S.session = null; S.err = "";
+    $("pill").className = "pill"; show("login");
+  }
+}
+
+async function signOut() {
+  await kvSet("wipe", true);
+  await sync();
+  if (S.session) {
+    const n = (await outAll()).length;
+    $("homeMsg").textContent = n + " entr" + (n > 1 ? "ies are" : "y is") + " still uploading. The app signs out by itself once they are saved.";
+  }
+}
+
+/* ===== ATTENDANCE ===== */
+function openAtt() {
+  S.photo = null; $("prev").style.display = "none"; $("cam").value = ""; $("attMsg").textContent = "";
+  $("camLbl").textContent = S.session.profile.photoRequired ? "📷 Take photo (required)" : "📷 Take photo (optional)";
+  show("att"); render(); fetchLoc();
+}
+
+async function renderAtt(st) {
+  $("attStatus").textContent = st.open ? "Logged in since" : "Not logged in today";
+  $("attTime").textContent = st.open ? new Date(st.open.loginTs).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "--:--";
+  const b = $("attBtn");
+  b.textContent = st.open ? "Logout" : "Login";
+  b.className = "btn" + (st.open ? " out" : "");
+  b.disabled = !S.coords || S.proc;
+}
+
+function fetchLoc() {
+  const note = $("gps");
+  if (!navigator.geolocation) { note.textContent = "This phone does not support location."; return; }
+  const ok = pos => { S.coords = { lat: pos.coords.latitude, lng: pos.coords.longitude }; note.textContent = "Location ready ✓"; render(); };
+  // quick rough fix first, precise fix replaces it a moment later
+  navigator.geolocation.getCurrentPosition(ok, () => {}, { enableHighAccuracy: false, timeout: 4000, maximumAge: 300000 });
+  navigator.geolocation.getCurrentPosition(ok, () => {
+    if (!S.coords) note.textContent = "Location is required. Turn on GPS, allow location, then reopen this screen.";
+  }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 });
+}
+
+function onPhoto(ev) {
+  const f = ev.target.files[0]; if (!f) return;
+  S.proc = true; render();
+  const rd = new FileReader();
+  rd.onload = e => {
+    const img = new Image();
+    img.onload = () => {
+      const w = Math.min(1000, img.width), h = Math.round(img.height * w / img.width);
+      const c = document.createElement("canvas"); c.width = w; c.height = h;
+      c.getContext("2d").drawImage(img, 0, 0, w, h);
+      S.photo = c.toDataURL("image/jpeg", 0.65);
+      $("prev").src = S.photo; $("prev").style.display = "block";
+      S.proc = false; render();
+    };
+    img.src = e.target.result;
+  };
+  rd.readAsDataURL(f);
+}
+
+async function attAction() {
+  const pf = S.session.profile, msg = $("attMsg");
+  if (!S.coords) { msg.textContent = "Location is required."; return; }
+  if (pf.photoRequired && !S.photo) { msg.textContent = "Photo is required for your account."; return; }
+  const st = await derive();
+  const op = {
+    opId: crypto.randomUUID(), type: st.open ? "logout" : "login",
+    entryId: st.open ? st.open.entryId : crypto.randomUUID(),   // made on the phone so a retry can never create a duplicate row
+    ts: Date.now(), lat: S.coords.lat, lng: S.coords.lng, photo: S.photo || ""
+  };
+  await outPut(op);                       // saved on the phone first — works with any net
+  msg.textContent = "";
+  S.photo = null; $("prev").style.display = "none"; $("cam").value = "";
+  if (op.type === "logout" && WIPE_ON_ATT_LOGOUT) await kvSet("wipe", true);
+  await render();
+  sync();
+}
+
+/* ===== START ===== */
+(async function () {
+  if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
+  const s = await kvGet("session");
+  if (s) { S.session = s; show("home"); render(); sync(); } else show("login");
+  addEventListener("online", sync);
+  addEventListener("offline", render);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) sync(); });
+  setInterval(sync, 60000);
+  $("p").addEventListener("keydown", e => { if (e.key === "Enter") doLogin(); });
+})();
+</script>
+</body>
+</html>
