@@ -41,6 +41,7 @@ button{font:inherit;cursor:pointer}
 .big{font-size:24px;font-weight:700;margin-top:6px}
 .sub{font-size:13px;color:var(--mut)}
 .cap{display:inline-block;padding:10px 18px;border:1px dashed rgba(240,180,41,.4);border-radius:10px;color:var(--gold);font-size:13px;cursor:pointer;letter-spacing:0;text-transform:none;margin:0}
+button.cap{background:none;font:inherit;font-size:13px}
 #prev{display:none;max-width:130px;border-radius:10px;margin:10px auto 0}
 </style>
 </head>
@@ -89,7 +90,7 @@ button{font:inherit;cursor:pointer}
       <div class="big" id="attTime">--:--</div>
     </div>
     <div style="text-align:center;margin-bottom:16px">
-      <label class="cap" for="cam" id="camLbl">📷 Take photo</label>
+      <button type="button" class="cap" id="camLbl" onclick="takePhoto()">📷 Take photo</button>
       <input id="cam" type="file" accept="image/*" capture="user" hidden onchange="onPhoto(event)">
       <br><img id="prev" alt="">
     </div>
@@ -99,6 +100,11 @@ button{font:inherit;cursor:pointer}
   </div>
 
   <div class="small" style="margin-top:28px">Jay Baba Group · Internal Use Only</div>
+</div>
+
+<div id="camBox" style="display:none;position:fixed;inset:0;z-index:50;background:#000;flex-direction:column;align-items:center;justify-content:center;gap:16px">
+  <video id="camVideo" playsinline muted style="width:100%;max-height:70vh;object-fit:contain;transform:scaleX(-1)"></video>
+  <div style="display:flex;gap:12px;width:100%;max-width:380px;padding:0 20px"><button class="btn ghost" onclick="closeCam()">Cancel</button><button class="btn" onclick="snap()">Capture</button></div>
 </div>
 
 <script>
@@ -132,7 +138,10 @@ const wipeAll = () => dbp.then(db => new Promise(res => {
 }));
 
 /* ===== SCREEN HELPERS ===== */
-function show(id) { document.querySelectorAll(".screen").forEach(e => e.classList.toggle("on", e.id === id)); }
+function show(id) {
+  document.querySelectorAll(".screen").forEach(e => e.classList.toggle("on", e.id === id));
+  if (id === "home" || id === "att") localStorage.setItem("scr", id);
+}
 
 /* What the user sees = last server copy + entries still waiting on the phone */
 async function derive() {
@@ -328,11 +337,36 @@ async function retryGate() {
   else { show("home"); render(); }
 }
 
+/* ===== IN-PAGE CAMERA: the page never leaves the screen, so low-memory phones do not reload it ===== */
+let camStream = null;
+async function takePhoto() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return $("cam").click();
+  try {
+    camStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 1280 } }, audio: false });
+    const v = $("camVideo"); v.srcObject = camStream; await v.play();
+    $("camBox").style.display = "flex";
+  } catch (e) { closeCam(); $("cam").click(); }   // camera blocked or not supported: use the phone's camera app instead
+}
+function snap() {
+  const v = $("camVideo");
+  if (!v.videoWidth) return;
+  const w = Math.min(1000, v.videoWidth), h = Math.round(v.videoHeight * w / v.videoWidth);
+  const c = document.createElement("canvas"); c.width = w; c.height = h;
+  c.getContext("2d").drawImage(v, 0, 0, w, h);
+  S.photo = c.toDataURL("image/jpeg", 0.65);
+  $("prev").src = S.photo; $("prev").style.display = "block";
+  closeCam(); render();
+}
+function closeCam() {
+  if (camStream) camStream.getTracks().forEach(t => t.stop());
+  camStream = null; $("camBox").style.display = "none";
+}
+
 /* ===== START ===== */
 (async function () {
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
-  const s = await kvGet("session");
-  if (s) { S.session = s; if (await checkGate()) retryGate(); else { show("home"); render(); sync(); } } else show("login");
+  const s = await kvGet("session"), back = localStorage.getItem("scr");
+  if (s) { S.session = s; if (await checkGate()) retryGate(); else { show("home"); render(); sync(); if (back === "att") openAtt(); } } else show("login");
   addEventListener("online", () => $("gate").classList.contains("on") ? retryGate() : sync());
   addEventListener("offline", render);
   document.addEventListener("visibilitychange", () => { if (!document.hidden) sync(); });
