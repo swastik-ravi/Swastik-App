@@ -34,6 +34,7 @@ button{font:inherit;cursor:pointer}
 .btn.out{background:linear-gradient(180deg,#E36A6A,#B93D3D);color:#fff}
 .btn.ghost{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.15);color:var(--mut)}
 .btn.link{display:block;text-align:center;text-decoration:none;padding:12px;font-size:14px}
+.btn.link.done{background:linear-gradient(180deg,#A8E6B3,#7CCB8B);color:#14120E;box-shadow:none}
 .btn:disabled{opacity:.5}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:18px 0}
 .tile{text-align:center;padding:22px 8px;border-radius:14px;border:1px solid rgba(240,180,41,.2);background:rgba(255,255,255,.03);color:var(--gold);font-weight:700;font-size:14px}
@@ -92,7 +93,7 @@ details.grp summary b{background:var(--gold);color:var(--ink);border-radius:20px
 
   <div id="login" class="screen card">
     <label for="u">Username</label>
-    <input id="u" placeholder="Enter Username" autocapitalize="characters" autocomplete="username">
+    <input id="u" placeholder="Enter username" autocapitalize="characters" autocomplete="username">
     <label for="p">Password</label>
     <div style="position:relative"><input id="p" type="password" placeholder="Enter password" autocomplete="current-password" style="padding-right:64px"><button type="button" id="pwBtn" onclick="togglePw()" style="position:absolute;right:6px;top:6px;background:none;border:0;color:var(--mut);font-size:12px;letter-spacing:.5px;padding:10px">SHOW</button></div>
     <button class="btn" id="loginBtn" onclick="doLogin()">Login</button>
@@ -631,12 +632,18 @@ function dailyHtml(a) {
   return a.map(t =>
     '<div class="card titem"><div class="tcode">' + esc(t.code) + (t.date ? " · " + esc(t.date) : "") + "</div>" +
     '<div class="ttext">' + esc(t.task) + "</div>" +
-    (t.link ? '<a class="btn link" href="' + esc(t.link) + '" target="_blank" rel="noopener" onclick="return fcheck()">📝 Click to Open</a>' : "") +
+    (t.link ? '<a class="btn link' + (wasOpened(t.code) ? " done" : "") + '" href="' + esc(t.link) + '" target="_blank" rel="noopener" data-code="' + esc(t.code) + '" onclick="return fopen(this)">' + (wasOpened(t.code) ? "✓ Form Opened" : "Open Form") + "</a>" : "") +
     "</div>").join("");
 }
 
-function fcheck() {
+/* Tasks whose form was opened are remembered on this phone (task codes are unique per day) */
+function openedList() { try { return JSON.parse(localStorage.getItem("opened") || "[]"); } catch (e) { return []; } }
+function wasOpened(code) { return openedList().indexOf(code) >= 0; }
+function fopen(a) {
   if (!navigator.onLine) { alert("Form kholne ke liye internet chahiye."); return false; }
+  const code = a.dataset.code, l = openedList();
+  if (l.indexOf(code) < 0) { l.push(code); while (l.length > 400) l.shift(); try { localStorage.setItem("opened", JSON.stringify(l)); } catch (e) { } }
+  a.classList.add("done"); a.textContent = "✓ Form Opened";
   return true;
 }
 
