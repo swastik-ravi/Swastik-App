@@ -13,6 +13,8 @@
 *{box-sizing:border-box}
 body{margin:0;min-height:100vh;display:flex;justify-content:center;color:var(--cream);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:radial-gradient(ellipse at 50% -10%,rgba(240,180,41,.18),transparent 55%),#14120E}
 .app{position:relative;z-index:1;width:100%;max-width:380px;min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;justify-content:center;padding:max(28px,env(safe-area-inset-top)) 20px max(32px,env(safe-area-inset-bottom))}
+.app.top{justify-content:flex-start;padding-top:max(16px,env(safe-area-inset-top))}
+.app.top .brand{display:none}
 .bg{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}.bg svg{position:absolute;bottom:-40px;left:50%;transform:translateX(-50%);width:140%;max-width:900px;opacity:.16;filter:blur(2px)}
 .small{font-size:11px;letter-spacing:.3px;color:#6E6858;text-align:center}
 .btn:not(.out):not(.ghost){box-shadow:0 6px 18px rgba(240,180,41,.18)}
@@ -23,6 +25,7 @@ body{margin:0;min-height:100vh;display:flex;justify-content:center;color:var(--c
 .mark i{font-style:normal;margin-top:6px;font-size:13px;letter-spacing:6px;font-weight:700;color:var(--ink);background:var(--gold);padding:2px 14px;border-radius:3px}
 .tag{margin-top:12px;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#9A9280}
 .card{background:rgba(255,255,255,.03);border:1px solid rgba(240,180,41,.18);border-radius:14px;padding:22px}
+.card.tap{cursor:pointer}
 label{display:block;font-size:12px;letter-spacing:1px;text-transform:uppercase;color:var(--mut);margin:0 0 7px}
 input{width:100%;padding:14px;font-size:16px;border-radius:10px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);color:var(--cream);margin-bottom:16px;outline:none}
 input:focus{border-color:var(--gold)}
@@ -30,6 +33,7 @@ button{font:inherit;cursor:pointer}
 .btn{width:100%;padding:15px;border:0;border-radius:12px;font-size:16px;font-weight:700;background:linear-gradient(180deg,var(--gold),var(--gold2));color:var(--ink)}
 .btn.out{background:linear-gradient(180deg,#E36A6A,#B93D3D);color:#fff}
 .btn.ghost{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.15);color:var(--mut)}
+.btn.link{display:block;text-align:center;text-decoration:none;padding:12px;font-size:14px}
 .btn:disabled{opacity:.5}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:18px 0}
 .tile{text-align:center;padding:22px 8px;border-radius:14px;border:1px solid rgba(240,180,41,.2);background:rgba(255,255,255,.03);color:var(--gold);font-weight:700;font-size:14px}
@@ -43,11 +47,41 @@ button{font:inherit;cursor:pointer}
 .cap{display:inline-block;padding:10px 18px;border:1px dashed rgba(240,180,41,.4);border-radius:10px;color:var(--gold);font-size:13px;cursor:pointer;letter-spacing:0;text-transform:none;margin:0}
 button.cap{background:none;font:inherit;font-size:13px}
 #prev{display:none;max-width:130px;border-radius:10px;margin:10px auto 0}
+
+/* ---- Dashboard ---- */
+.dhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.dhead .btn{width:auto;padding:10px 14px;font-size:14px}
+.dtitle{color:var(--gold);font-size:13px;font-weight:700;margin:16px 0 8px}
+.row2{display:flex;gap:10px;margin-bottom:12px}
+.row2 select{flex:1;min-width:0;padding:10px;border-radius:10px;font-size:14px;background:rgba(255,255,255,.06);color:var(--cream);border:1px solid rgba(240,180,41,.3)}
+.row2 .btn{flex:1;padding:10px;font-size:14px}
+.cwrap{width:100%;overflow-x:auto}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.mini{padding:12px 8px;text-align:center}
+.mini .dtitle{margin:0 0 2px}
+.bars{display:flex;justify-content:center;gap:16px;margin-top:6px}
+.bcol{display:flex;flex-direction:column;align-items:center;width:56px}
+.btop{height:30px;font-size:11px;font-weight:700;color:#F4A0A0;line-height:1.15;display:flex;align-items:flex-end;justify-content:center;text-align:center}
+.bbox{height:96px;display:flex;align-items:flex-end}
+.bar{width:34px;border-radius:5px 5px 0 0;min-height:2px}
+.bnum{font-size:18px;font-weight:700;margin-top:4px}
+.bcap{font-size:10px;color:var(--mut)}
+.tabbtn{flex:1;padding:12px 6px;border-radius:12px;border:1px solid rgba(240,180,41,.3);background:rgba(255,255,255,.04);color:var(--gold);font-weight:700;font-size:13px}
+.tabbtn.on{background:var(--gold);color:var(--ink)}
+details.grp{background:rgba(255,255,255,.03);border:1px solid rgba(240,180,41,.18);border-radius:12px;margin-bottom:8px;overflow:hidden}
+details.grp summary{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 14px;font-size:13px;font-weight:600;cursor:pointer;list-style:none}
+details.grp summary::-webkit-details-marker{display:none}
+details.grp summary b{background:var(--gold);color:var(--ink);border-radius:20px;padding:2px 10px;font-size:12px}
+.prow{display:flex;justify-content:space-between;gap:10px;padding:8px 14px;border-top:1px solid rgba(255,255,255,.06);font-size:12px;color:#D8CBA5}
+.prow .late{color:#F4A0A0;font-weight:700}
+.titem{padding:14px;margin-bottom:10px}
+.tcode{font-size:11px;color:var(--mut);margin-bottom:4px}
+.ttext{font-size:14px;margin-bottom:12px;line-height:1.4}
 </style>
 </head>
 <body>
 <div class="bg"><svg viewBox="0 0 400 220" xmlns="http://www.w3.org/2000/svg"><g stroke="#F0B429" stroke-width="2" fill="none" stroke-linecap="round"><path d="M40 220C30 160 60 120 50 60"/><path d="M90 220C85 150 110 110 95 40"/><path d="M150 220C140 170 170 130 155 70"/><path d="M220 220C210 150 250 120 230 50"/><path d="M280 220C270 160 300 110 285 45"/><path d="M340 220C330 170 360 130 345 65"/></g><g fill="#F0B429"><ellipse cx="50" cy="60" rx="6" ry="11"/><ellipse cx="65" cy="75" rx="5" ry="10"/><ellipse cx="95" cy="40" rx="6" ry="11"/><ellipse cx="110" cy="55" rx="5" ry="10"/><ellipse cx="155" cy="70" rx="6" ry="11"/><ellipse cx="230" cy="50" rx="6" ry="11"/><ellipse cx="285" cy="45" rx="6" ry="11"/><ellipse cx="345" cy="65" rx="6" ry="11"/></g></svg></div>
-<div class="app">
+<div class="app" id="appBox">
   <div class="brand">
     <div class="mark"><b>SWASTIK</b><i>RICE</i></div>
     <div class="tag">Healthy Rice for Stronger India</div>
@@ -58,7 +92,7 @@ button.cap{background:none;font:inherit;font-size:13px}
 
   <div id="login" class="screen card">
     <label for="u">Username</label>
-    <input id="u" placeholder="e.g.Enter Username" autocapitalize="characters" autocomplete="username">
+    <input id="u" placeholder="e.g. BRAJESH@466" autocapitalize="characters" autocomplete="username">
     <label for="p">Password</label>
     <div style="position:relative"><input id="p" type="password" placeholder="Enter password" autocomplete="current-password" style="padding-right:64px"><button type="button" id="pwBtn" onclick="togglePw()" style="position:absolute;right:6px;top:6px;background:none;border:0;color:var(--mut);font-size:12px;letter-spacing:.5px;padding:10px">SHOW</button></div>
     <button class="btn" id="loginBtn" onclick="doLogin()">Login</button>
@@ -66,7 +100,7 @@ button.cap{background:none;font:inherit;font-size:13px}
   </div>
 
   <div id="home" class="screen">
-    <div class="card" style="padding:12px 14px;font-size:13px;color:#D8CBA5" id="sum"></div>
+    <div class="card tap" style="padding:12px 14px;font-size:13px;color:#D8CBA5" id="sum" onclick="openDash()"></div>
     <h2 id="hi" style="text-align:center;color:var(--gold);margin:20px 0 2px"></h2>
     <div class="sub" style="text-align:center">What would you like to do?</div>
     <div class="grid">
@@ -82,6 +116,15 @@ button.cap{background:none;font:inherit;font-size:13px}
   </div>
 
   <div id="gate" class="screen card" style="text-align:center"><div style="font-size:30px">📶</div><p class="sub" style="margin:10px 0 16px">You have not been online for over 15 days. Please connect to the internet once and tap Retry. Your saved entries are safe.</p><button class="btn" onclick="retryGate()">Retry</button><div class="msg" id="gateMsg"></div></div>
+
+  <div id="dash" class="screen">
+    <div class="dhead">
+      <button class="btn ghost" onclick="show('home');render()">← Back</button>
+      <button class="btn ghost" id="dRef" onclick="refreshDash()">⟳ Refresh</button>
+    </div>
+    <div class="sub" id="dUpd" style="text-align:center;margin:0 0 12px"></div>
+    <div id="dBody"></div>
+  </div>
 
   <div id="att" class="screen">
     <button class="btn ghost" style="width:auto;padding:10px 16px;margin-bottom:18px" onclick="show('home');render()">← Back</button>
@@ -99,7 +142,7 @@ button.cap{background:none;font:inherit;font-size:13px}
     <div class="msg" id="attMsg"></div>
   </div>
 
-  <div class="small" style="margin-top:28px">Jay Baba Group · Internal Use Only</div>
+  <div class="small" id="foot" style="margin-top:28px">Jay Baba Group · Internal Use Only</div>
 </div>
 
 <div id="camBox" style="display:none;position:fixed;inset:0;z-index:50;background:#000;flex-direction:column;align-items:center;justify-content:center;gap:16px">
@@ -112,12 +155,31 @@ button.cap{background:none;font:inherit;font-size:13px}
 const API_URL = "https://script.google.com/macros/s/AKfycbxFv9zn77R22Kr1V131y7Zv9zxVDxLyahta2s2TcQj-NemUt5jGZaayAPJ_cQ4KQGIc/exec";   // the Web app link from Apps Script (…/exec)
 const WIPE_ON_ATT_LOGOUT = false;               // false = stay logged in like WhatsApp; data is cleared only by Sign out (after upload)
 const OFFLINE_DAYS = 15;                        // longest time the app may run without ever touching the server
+const DASH_STALE_MS = 600000;                   // opening the Dashboard re-fetches if the saved copy is older than 10 min
 
 const $ = id => document.getElementById(id);
-const S = { session: null, busy: false, needLogin: false, err: "", coords: null, photo: null, proc: false };
+const S = { session: null, busy: false, needLogin: false, err: "", coords: null, photo: null, proc: false, dash: null, dashBusy: false, dRange: "3", dTab: "p" };
 const dayKey = ts => new Date(ts).toLocaleDateString("en-CA"); // yyyy-mm-dd
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
-/* ===== PHONE STORAGE (IndexedDB): kv = profile/snapshot, outbox = entries waiting to upload ===== */
+/* ===== SMALL DIAGNOSTIC LOG (tap the footer text 5 times to read it) ===== */
+function logEvt(m) {
+  try {
+    const a = JSON.parse(localStorage.getItem("swlog") || "[]");
+    a.push(new Date().toLocaleString() + " | " + m + " | mem:" + (navigator.deviceMemory || "?") + " | " + navigator.userAgent.slice(0, 100));
+    while (a.length > 15) a.shift();
+    localStorage.setItem("swlog", JSON.stringify(a));
+  } catch (e) { }
+}
+window.addEventListener("error", e => logEvt("error: " + e.message));
+window.addEventListener("unhandledrejection", e => logEvt("promise: " + ((e.reason && e.reason.message) || e.reason)));
+let footTaps = [];
+$("foot").addEventListener("click", () => {
+  const n = Date.now(); footTaps = footTaps.filter(t => n - t < 3000); footTaps.push(n);
+  if (footTaps.length >= 5) { footTaps = []; alert(JSON.parse(localStorage.getItem("swlog") || "[]").join("\n\n") || "Log khali hai."); }
+});
+
+/* ===== PHONE STORAGE (IndexedDB): kv = profile/snapshot/dashboard, outbox = entries waiting to upload ===== */
 const dbp = new Promise((res, rej) => {
   const q = indexedDB.open("swastik", 1);
   q.onupgradeneeded = () => { q.result.createObjectStore("kv"); q.result.createObjectStore("outbox", { keyPath: "opId" }); };
@@ -140,6 +202,7 @@ const wipeAll = () => dbp.then(db => new Promise(res => {
 /* ===== SCREEN HELPERS ===== */
 function show(id) {
   document.querySelectorAll(".screen").forEach(e => e.classList.toggle("on", e.id === id));
+  $("appBox").classList.toggle("top", id === "dash");
   if (id === "home" || id === "att") localStorage.setItem("scr", id);
 }
 
@@ -158,18 +221,33 @@ async function derive() {
   return { open, pending: ops.length, presentCount: [...present].filter(d => d.startsWith(ym)).length };
 }
 
+/* Home top card: one line of the dashboard; tapping it opens the Dashboard */
+function sumHtml(st) {
+  const d = S.dash;
+  let t = "This month: present <b style='color:var(--gold)'>" + st.presentCount + "</b> day(s)";
+  if (d && d.role === "sales" && d.sales && d.sales.length) {
+    const cur = d.sales[d.sales.length - 1], att = d.attendance;
+    t = "This month: <b style='color:var(--gold)'>" + cur.percentage + "%</b> of target &nbsp;•&nbsp; Present <b style='color:var(--gold)'>" + att.presentDaysThisMonth + "/" + att.workingDaysSoFar + "</b> days";
+  } else if (d && d.role === "office") {
+    const lv = d.leave && d.leave.balance != null ? "Leaves <b style='color:var(--gold)'>" + d.leave.balance + "</b>" : "";
+    const wk = d.week && d.week.found ? "Week <b style='color:var(--gold)'>" + d.week.actual + "/" + d.week.planned + "</b> done" : "";
+    t = [wk, "Pending <b style='color:var(--gold)'>" + d.pending.count + "</b>", lv].filter(Boolean).join(" &nbsp;•&nbsp; ");
+  }
+  return "<div style='display:flex;justify-content:space-between;align-items:center;gap:8px'><div>" + t + "</div><div style='color:var(--gold);font-size:16px;white-space:nowrap'>📊 ›</div></div>";
+}
+
 async function render() {
   if (!S.session) return;
   const st = await derive(), pf = S.session.profile;
   $("hi").textContent = "Welcome, " + pf.name.split(" ")[0] + "!";
-  $("sum").innerHTML = "This month: present <b style='color:var(--gold)'>" + st.presentCount + "</b> day(s)";
+  $("sum").innerHTML = sumHtml(st);
   $("tAtt").classList.toggle("off", !pf.attendanceAccess);
 
   let t = "", warn = false;
   if (S.needLogin) { t = "🔒 Session ended. Tap here to login again — your saved entries are safe."; warn = true; }
   else if (st.pending) t = (S.busy ? "⏫ Uploading " : "⏳ ") + st.pending + (st.pending > 1 ? " entries" : " entry") + (S.busy ? "…" : " waiting to upload") + (navigator.onLine ? "" : " (will upload when net returns)");
   else if (!navigator.onLine) t = "📴 Offline — everything is saved on your phone";
-  if (S.err && !S.needLogin) { t += " · " + S.err; warn = true; }
+  if (S.err && !S.needLogin) { t = t ? t + " · " + S.err : S.err; warn = true; }
   $("pill").textContent = t;
   $("pill").className = "pill" + (t ? " on" : "") + (warn ? " warn" : "");
   if ($("att").classList.contains("on")) renderAtt(st);
@@ -193,8 +271,9 @@ async function doLogin() {
     S.session = { token: r.token, exp: r.exp, profile: r.profile };
     await kvSet("session", S.session); await kvSet("snap", r.attendance); await kvSet("holidays", r.holidays);
     await kvSet("wipe", false); await kvSet("lastOnline", Date.now()); S.needLogin = false; S.err = ""; $("p").value = "";
+    S.dash = null; await kvSet("dash", null);   // never show a previous user's dashboard
     if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
-    show("home"); render(); sync();
+    show("home"); render(); sync(); fetchDash();
   } catch (e) {
     msg.textContent = "No internet. The first login of the day needs net.";
   } finally { btn.disabled = false; btn.textContent = "Login"; }
@@ -224,7 +303,7 @@ async function sync() {
 /* Clear the phone only when nothing is left waiting */
 async function afterSync() {
   if ((await outAll()).length === 0 && (await kvGet("wipe"))) {
-    await wipeAll(); S.session = null; S.err = "";
+    await wipeAll(); S.session = null; S.dash = null; S.err = "";
     $("pill").className = "pill"; show("login");
   }
 }
@@ -267,6 +346,7 @@ function fetchLoc() {
 
 function onPhoto(ev) {
   const f = ev.target.files[0]; if (!f) return;
+  localStorage.removeItem("camAt");
   S.proc = true; render();
   const rd = new FileReader();
   rd.onload = e => {
@@ -309,6 +389,7 @@ async function maybeRefresh(force) {
   if (S.busy || !S.session || !navigator.onLine) return;
   if (!force && Date.now() - ((await kvGet("lastRefresh")) || 0) < 3600000) return;
   S.busy = true;
+  let refreshed = false;
   try {
     const r = await api({ action: "refresh", token: S.session.token });
     if (r.auth === false) S.needLogin = true;
@@ -316,9 +397,11 @@ async function maybeRefresh(force) {
       S.session = { token: r.token, exp: r.exp, profile: r.profile };
       await kvSet("session", S.session); await kvSet("snap", r.attendance); await kvSet("holidays", r.holidays);
       await kvSet("lastOnline", Date.now()); await kvSet("lastRefresh", Date.now()); S.needLogin = false;
+      refreshed = true;
     }
   } catch (e) { /* no net: keep working from the phone */ }
   S.busy = false; render();
+  if (refreshed) fetchDash();   // the dashboard is refreshed together with the hourly refresh
 }
 
 async function checkGate() {
@@ -340,12 +423,14 @@ async function retryGate() {
 /* ===== IN-PAGE CAMERA: the page never leaves the screen, so low-memory phones do not reload it ===== */
 let camStream = null;
 async function takePhoto() {
+  localStorage.setItem("camAt", Date.now());
+  logEvt("camera open");
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return $("cam").click();
   try {
     camStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 1280 } }, audio: false });
     const v = $("camVideo"); v.srcObject = camStream; await v.play();
     $("camBox").style.display = "flex";
-  } catch (e) { closeCam(); $("cam").click(); }   // camera blocked or not supported: use the phone's camera app instead
+  } catch (e) { logEvt("camera blocked: " + (e && e.name)); closeCam(true); $("cam").click(); }   // camera blocked or not supported: use the phone's camera app instead
 }
 function snap() {
   const v = $("camVideo");
@@ -357,15 +442,248 @@ function snap() {
   $("prev").src = S.photo; $("prev").style.display = "block";
   closeCam(); render();
 }
-function closeCam() {
+function closeCam(keepMark) {
   if (camStream) camStream.getTracks().forEach(t => t.stop());
   camStream = null; $("camBox").style.display = "none";
+  if (keepMark !== true) localStorage.removeItem("camAt");
+}
+
+/* ===== DASHBOARD ===== */
+function openDash() {
+  show("dash"); renderDash();
+  if (!S.dash || Date.now() - (S.dash.fetchedAt || 0) > DASH_STALE_MS) fetchDash();
+}
+function refreshDash() {
+  if (!navigator.onLine) { alert("Refresh ke liye internet chahiye."); return; }
+  fetchDash(true);
+}
+
+async function fetchDash(fresh) {
+  if (S.dashBusy || !S.session || !navigator.onLine) return;
+  S.dashBusy = true;
+  const b = $("dRef"); if (b) b.textContent = "Loading…";
+  try {
+    const r = await api({ action: "dashboard", token: S.session.token, fresh: !!fresh });
+    if (r.auth === false) S.needLogin = true;
+    else if (r.ok && r.data) { r.data.fetchedAt = Date.now(); S.dash = r.data; await kvSet("dash", r.data); }
+  } catch (e) { /* offline or weak net: keep the saved copy */ }
+  S.dashBusy = false;
+  if (b) b.textContent = "⟳ Refresh";
+  render();
+  if ($("dash").classList.contains("on")) renderDash();
+}
+
+function renderDash() {
+  const d = S.dash, body = $("dBody");
+  $("dUpd").textContent = d && d.fetchedAt ? "Updated: " + new Date(d.fetchedAt).toLocaleString([], { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "";
+  if (!d) {
+    body.innerHTML = '<div class="card sub" style="text-align:center">' + (navigator.onLine ? "Dashboard load ho raha hai…" : "Net aate hi dashboard dikhega.") + "</div>";
+    return;
+  }
+  if (d.role === "sales") return renderSales(d);
+  if (d.role === "office") return renderOffice(d);
+  body.innerHTML = '<div class="card sub" style="text-align:center">Is account ke liye dashboard abhi taiyar nahi hai.</div>';
+}
+
+/* crisp canvas on phone screens */
+function cv(c, w, h) {
+  const dpr = window.devicePixelRatio || 1;
+  c.width = Math.round(w * dpr); c.height = Math.round(h * dpr);
+  c.style.width = w + "px"; c.style.height = h + "px";
+  const x = c.getContext("2d"); x.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return x;
+}
+
+/* ---------- SALES dashboard (same as the old app, now full screen) ---------- */
+function renderSales(d) {
+  $("dBody").innerHTML =
+    '<div class="row2"><select id="dRange" onchange="drawSales()"><option value="3">Last 3 months</option><option value="6">Last 6 months</option><option value="12">Last 12 months</option></select>' +
+    '<button class="btn" onclick="togglePW()">Party wise ▾</button></div>' +
+    '<div id="pwRow" style="display:none;gap:8px;align-items:flex-end;margin:-2px 0 12px;flex-wrap:wrap">' +
+      '<div style="flex:1;min-width:110px"><label>From</label><input type="date" id="pwFrom" style="margin:0"></div>' +
+      '<div style="flex:1;min-width:110px"><label>To</label><input type="date" id="pwTo" style="margin:0"></div>' +
+      '<button class="btn" style="width:auto;padding:13px 18px;font-size:14px" onclick="showPW()">Show</button>' +
+    '</div>' +
+    '<div class="msg" id="pwMsg" style="margin:0 0 6px"></div>' +
+    '<div class="dtitle" id="dChartTitle">SALES vs TARGET (TN)</div>' +
+    '<div class="cwrap"><canvas id="cSales"></canvas></div>' +
+    '<div class="dtitle">THIS MONTH ATTENDANCE</div>' +
+    '<div style="display:flex;justify-content:center"><canvas id="cDonut"></canvas></div>';
+  $("dRange").value = S.dRange;
+  drawSales();
+  drawDonut($("cDonut"), d.attendance);
+}
+
+function drawSales() {
+  S.dRange = $("dRange").value;
+  $("dChartTitle").textContent = "SALES vs TARGET (TN)";
+  $("pwMsg").textContent = "";
+  drawBars($("cSales"), S.dash.sales.slice(-Number(S.dRange)));
+}
+
+function togglePW() {
+  const row = $("pwRow"), open = row.style.display !== "none";
+  row.style.display = open ? "none" : "flex";
+  if (open) drawSales();
+}
+
+async function showPW() {
+  const from = $("pwFrom").value, to = $("pwTo").value, msg = $("pwMsg");
+  if (!from || !to) { msg.textContent = "From aur To dono date chuno."; return; }
+  if (from > to) { msg.textContent = "From date, To date se pehle honi chahiye."; return; }
+  if (!navigator.onLine) { msg.textContent = "Party wise ke liye internet chahiye."; return; }
+  msg.style.color = "#B8AF9B"; msg.textContent = "Loading…";
+  try {
+    const r = await api({ action: "partyWise", token: S.session.token, from: from, to: to });
+    if (r.auth === false) { S.needLogin = true; render(); msg.textContent = ""; return; }
+    msg.style.color = "";
+    if (!r.ok) { msg.textContent = r.message || "Kuch gadbad hui."; return; }
+    if (!r.parties.length) { msg.textContent = "Is period me koi party sale nahi mili."; return; }
+    msg.textContent = "";
+    $("dChartTitle").textContent = "PARTY WISE SALES (TN)";
+    drawBars($("cSales"), r.parties.map(p => ({ month: p.name.length > 10 ? p.name.slice(0, 10) + "…" : p.name, achieved: p.achieved, target: p.target, percentage: p.percentage })));
+  } catch (e) { msg.style.color = ""; msg.textContent = "Net ki problem — dobara try karo."; }
+}
+
+function drawBars(canvas, rows) {
+  const bw = 46, gap = 22, ch = 180, ls = 46;
+  const w = Math.max(320, rows.length * (bw + gap) + gap), h = ch + ls;
+  const x = cv(canvas, w, h); x.clearRect(0, 0, w, h);
+  const mx = Math.max.apply(null, rows.map(s => Math.max(s.achieved, s.target)).concat([1]));
+  x.textAlign = "center";
+  rows.forEach((s, i) => {
+    const px = gap + i * (bw + gap), ah = s.achieved / mx * ch, ty = ch - s.target / mx * ch;
+    x.fillStyle = s.percentage >= 100 ? "#3FA34D" : "#F0B429";
+    x.fillRect(px, ch - ah, bw, ah);
+    x.strokeStyle = "#E36A6A"; x.setLineDash([4, 3]);
+    x.beginPath(); x.moveTo(px - 4, ty); x.lineTo(px + bw + 4, ty); x.stroke(); x.setLineDash([]);
+    x.fillStyle = "#F0B429"; x.font = "bold 11px Arial";
+    x.fillText(s.percentage + "%", px + bw / 2, ch - ah - 6);
+    x.fillStyle = "#B8AF9B"; x.font = "10px Arial";
+    x.fillText(s.month, px + bw / 2, ch + 16);
+    x.fillStyle = "#D8CBA5"; x.font = "bold 11px Arial";
+    x.fillText(s.achieved + " TN", px + bw / 2, ch + 30);
+  });
+}
+
+function drawDonut(canvas, att) {
+  const size = 200, x = cv(canvas, size, size), cx = size / 2, cy = size / 2, r = 80, lw = 22;
+  const frac = att.totalWorkingDaysInMonth > 0 ? Math.min(1, att.presentDaysThisMonth / att.totalWorkingDaysInMonth) : 0;
+  x.clearRect(0, 0, size, size);
+  x.beginPath(); x.arc(cx, cy, r, 0, Math.PI * 2); x.strokeStyle = "rgba(255,255,255,0.08)"; x.lineWidth = lw; x.stroke();
+  x.beginPath(); x.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2);
+  x.strokeStyle = "#F0B429"; x.lineWidth = lw; x.lineCap = "round"; x.stroke();
+  x.textAlign = "center";
+  x.fillStyle = "#FBF6EC"; x.font = "bold 26px Arial"; x.fillText(att.leavesRemaining, cx, cy - 2);
+  x.font = "11px Arial"; x.fillStyle = "#B8AF9B"; x.fillText("Leaves left", cx, cy + 18);
+  x.font = "12px Arial"; x.fillStyle = "#D8CBA5";
+  x.fillText(att.presentDaysThisMonth + " / " + att.totalWorkingDaysInMonth + " days present", cx, cy + r + 34);
+}
+
+/* ---------- OFFICE dashboard ---------- */
+function renderOffice(d) {
+  const w = d.week, bal = d.leave.balance;
+  let weekHtml;
+  if (w.found) {
+    const mx = Math.max(w.planned, w.actual, 1);
+    const hp = Math.max(2, Math.round(w.planned / mx * 96)), ha = Math.max(2, Math.round(w.actual / mx * 96));
+    weekHtml =
+      '<div class="sub" style="font-size:11px">' + esc(w.label) + "</div>" +
+      '<div class="bars">' +
+        '<div class="bcol"><div class="btop"></div><div class="bbox"><div class="bar" style="height:' + hp + 'px;background:#F0B429"></div></div><div class="bnum">' + w.planned + '</div><div class="bcap">Total task</div></div>' +
+        '<div class="bcol"><div class="btop">' + (w.pendingPct > 0 ? w.pendingPct + "% pending" : "✓ done") + '</div><div class="bbox"><div class="bar" style="height:' + ha + 'px;background:#3FA34D"></div></div><div class="bnum">' + w.actual + '</div><div class="bcap">Achieved</div></div>' +
+      "</div>";
+  } else {
+    weekHtml = '<div class="sub" style="font-size:12px;margin-top:14px">Is hafte ka data abhi nahi mila.</div>';
+  }
+  $("dBody").innerHTML =
+    '<div class="grid2">' +
+      '<div class="card mini"><div class="dtitle">Weekly Score</div>' + weekHtml + "</div>" +
+      '<div class="card mini"><div class="dtitle">Leave Balance</div><canvas id="cLeave"></canvas></div>' +
+    "</div>" +
+    '<div class="row2">' +
+      '<button class="tabbtn" id="bPend" onclick="offTab(\'p\')">Weekly Pending (' + d.pending.count + ")</button>" +
+      '<button class="tabbtn" id="bDaily" onclick="offTab(\'d\')">Daily Task (' + d.daily.length + ")</button>" +
+    "</div>" +
+    '<div id="offList"></div>';
+  drawLeave($("cLeave"), bal, d.leave.max);
+  offTab(S.dTab);
+}
+
+function offTab(t) {
+  S.dTab = t;
+  $("bPend").classList.toggle("on", t === "p");
+  $("bDaily").classList.toggle("on", t === "d");
+  $("offList").innerHTML = t === "p" ? pendHtml(S.dash.pending) : dailyHtml(S.dash.daily);
+}
+
+function pendHtml(p) {
+  if (!p.count) return '<div class="card sub" style="text-align:center">🎉 Koi pending kaam nahi.</div>';
+  return '<div class="sub" style="margin-bottom:8px">Total pending: <b style="color:var(--gold)">' + p.count + "</b></div>" +
+    p.groups.map(g =>
+      '<details class="grp"><summary><span>' + esc(g.task) + "</span><b>" + g.count + "</b></summary>" +
+      g.items.map(it => '<div class="prow"><span>' + esc(it.id) + '</span><span class="' + (it.late ? "late" : "") + '">' + esc(it.date || "-") + (it.late ? " ⚠" : "") + "</span></div>").join("") +
+      "</details>").join("");
+}
+
+function dailyHtml(a) {
+  if (!a.length) return '<div class="card sub" style="text-align:center">Aaj ka koi task nahi.</div>';
+  return a.map(t =>
+    '<div class="card titem"><div class="tcode">' + esc(t.code) + (t.date ? " · " + esc(t.date) : "") + "</div>" +
+    '<div class="ttext">' + esc(t.task) + "</div>" +
+    (t.link ? '<a class="btn link" href="' + esc(t.link) + '" target="_blank" rel="noopener" onclick="return fcheck()">📝 Form kholo</a>' : "") +
+    "</div>").join("");
+}
+
+function fcheck() {
+  if (!navigator.onLine) { alert("Form kholne ke liye internet chahiye."); return false; }
+  return true;
+}
+
+/* Leave ring: full circle = max leaves. Zones along the ring: 1 deep red, 2 red, 3 light red, 4-6 yellow, 7+ green, colours blend smoothly. */
+const LV_STOPS = [[0.5, [198, 40, 40]], [1.5, [229, 83, 75]], [2.5, [242, 139, 130]], [3.5, [242, 201, 76]], [5.5, [242, 201, 76]], [6.5, [63, 163, 77]], [13, [63, 163, 77]]];
+function lvColor(v) {
+  const s = LV_STOPS;
+  if (v <= s[0][0]) return "rgb(" + s[0][1].join(",") + ")";
+  for (let i = 1; i < s.length; i++) {
+    if (v <= s[i][0]) {
+      const f = (v - s[i - 1][0]) / (s[i][0] - s[i - 1][0]), a = s[i - 1][1], b = s[i][1];
+      return "rgb(" + [0, 1, 2].map(k => Math.round(a[k] + (b[k] - a[k]) * f)).join(",") + ")";
+    }
+  }
+  return "rgb(" + s[s.length - 1][1].join(",") + ")";
+}
+
+function drawLeave(canvas, bal, max) {
+  const size = 130, x = cv(canvas, size, size), cx = size / 2, cy = size / 2, r = 50, lw = 15;
+  x.clearRect(0, 0, size, size);
+  x.beginPath(); x.arc(cx, cy, r, 0, Math.PI * 2); x.strokeStyle = "rgba(255,255,255,0.08)"; x.lineWidth = lw; x.stroke();
+  if (bal != null && bal > 0) {
+    const total = Math.min(1, bal / max) * 360, step = 2;
+    x.lineWidth = lw; x.lineCap = "butt";
+    for (let a = 0; a < total; a += step) {
+      const v = (a + step / 2) / 360 * max;
+      x.beginPath();
+      x.arc(cx, cy, r, (-90 + a) * Math.PI / 180, (-90 + Math.min(a + step + 0.8, total)) * Math.PI / 180);
+      x.strokeStyle = lvColor(v); x.stroke();
+    }
+  }
+  x.textAlign = "center";
+  x.fillStyle = "#FBF6EC"; x.font = "bold 26px Arial"; x.fillText(bal == null ? "–" : bal, cx, cy + 4);
+  x.font = "10px Arial"; x.fillStyle = "#B8AF9B"; x.fillText("left", cx, cy + 20);
 }
 
 /* ===== START ===== */
 (async function () {
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
+  const ca = Number(localStorage.getItem("camAt")) || 0;
+  if (ca && Date.now() - ca < 180000) {      // the page restarted while the camera was open
+    logEvt("PAGE RELOADED right after camera was opened");
+    S.err = "Camera ke dauran app reload hua tha — photo dobara lein.";
+  }
+  localStorage.removeItem("camAt");
   const s = await kvGet("session"), back = localStorage.getItem("scr");
+  S.dash = (await kvGet("dash")) || null;
   if (s) { S.session = s; if (await checkGate()) retryGate(); else { show("home"); render(); sync(); if (back === "att") openAtt(); } } else show("login");
   addEventListener("online", () => $("gate").classList.contains("on") ? retryGate() : sync());
   addEventListener("offline", render);
