@@ -212,7 +212,7 @@ window.addEventListener("unhandledrejection", e => logEvt("promise: " + ((e.reas
 let footTaps = [];
 $("foot").addEventListener("click", () => {
   const n = Date.now(); footTaps = footTaps.filter(t => n - t < 3000); footTaps.push(n);
-  if (footTaps.length >= 5) { footTaps = []; alert(JSON.parse(localStorage.getItem("swlog") || "[]").join("\n\n") || "Log khali hai."); }
+  if (footTaps.length >= 5) { footTaps = []; alert(JSON.parse(localStorage.getItem("swlog") || "[]").join("\n\n") || "Log is empty."); }
 });
 
 /* ===== PHONE STORAGE (IndexedDB): kv = profile/snapshot/dashboard, outbox = entries waiting to upload ===== */
@@ -494,7 +494,7 @@ function openDash() {
   if (!S.dash || Date.now() - (S.dash.fetchedAt || 0) > DASH_STALE_MS) fetchDash();
 }
 function refreshDash() {
-  if (!navigator.onLine) { alert("Refresh ke liye internet chahiye."); return; }
+  if (!navigator.onLine) { alert("Internet connection is needed to refresh."); return; }
   fetchDash(true);
 }
 
@@ -517,12 +517,12 @@ function renderDash() {
   const d = S.dash, body = $("dBody");
   $("dUpd").textContent = d && d.fetchedAt ? "Updated: " + new Date(d.fetchedAt).toLocaleString([], { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "";
   if (!d) {
-    body.innerHTML = '<div class="card sub" style="text-align:center">' + (navigator.onLine ? "Dashboard load ho raha hai…" : "Net aate hi dashboard dikhega.") + "</div>";
+    body.innerHTML = '<div class="card sub" style="text-align:center">' + (navigator.onLine ? "Loading dashboard…" : "The dashboard will appear once you are online.") + "</div>";
     return;
   }
   if (d.role === "sales") return renderSales(d);
   if (d.role === "office") return renderOffice(d);
-  body.innerHTML = '<div class="card sub" style="text-align:center">Is account ke liye dashboard abhi taiyar nahi hai.</div>';
+  body.innerHTML = '<div class="card sub" style="text-align:center">Dashboard is not available for this account yet.</div>';
 }
 
 /* crisp canvas on phone screens */
@@ -569,20 +569,20 @@ function togglePW() {
 
 async function showPW() {
   const from = $("pwFrom").value, to = $("pwTo").value, msg = $("pwMsg");
-  if (!from || !to) { msg.textContent = "From aur To dono date chuno."; return; }
-  if (from > to) { msg.textContent = "From date, To date se pehle honi chahiye."; return; }
-  if (!navigator.onLine) { msg.textContent = "Party wise ke liye internet chahiye."; return; }
+  if (!from || !to) { msg.textContent = "Please pick both a From and To date."; return; }
+  if (from > to) { msg.textContent = "From date must be on or before To date."; return; }
+  if (!navigator.onLine) { msg.textContent = "Internet connection is needed for Party wise."; return; }
   msg.style.color = "#B8AF9B"; msg.textContent = "Loading…";
   try {
     const r = await api({ action: "partyWise", token: S.session.token, from: from, to: to });
     if (r.auth === false) { S.needLogin = true; render(); msg.textContent = ""; return; }
     msg.style.color = "";
-    if (!r.ok) { msg.textContent = r.message || "Kuch gadbad hui."; return; }
-    if (!r.parties.length) { msg.textContent = "Is period me koi party sale nahi mili."; return; }
+    if (!r.ok) { msg.textContent = r.message || "Something went wrong."; return; }
+    if (!r.parties.length) { msg.textContent = "No party sales found for this period."; return; }
     msg.textContent = "";
     $("dChartTitle").textContent = "PARTY WISE SALES (TN)";
     drawBars($("cSales"), r.parties.map(p => ({ month: p.name.length > 10 ? p.name.slice(0, 10) + "…" : p.name, achieved: p.achieved, target: p.target, percentage: p.percentage })));
-  } catch (e) { msg.style.color = ""; msg.textContent = "Net ki problem — dobara try karo."; }
+  } catch (e) { msg.style.color = ""; msg.textContent = "Network problem — please try again."; }
 }
 
 function drawBars(canvas, rows) {
@@ -614,7 +614,7 @@ function drawDonut(canvas, att) {
   x.beginPath(); x.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2);
   x.strokeStyle = "#F0B429"; x.lineWidth = lw; x.lineCap = "round"; x.stroke();
   x.textAlign = "center";
-  x.fillStyle = "#FBF6EC"; x.font = "bold 26px Arial"; x.fillText(att.leavesRemaining, cx, cy - 2);
+  x.fillStyle = "#FBF6EC"; x.font = "bold 26px Arial"; x.fillText(att.leavesRemaining == null ? "–" : att.leavesRemaining, cx, cy - 2);
   x.font = "11px Arial"; x.fillStyle = "#B8AF9B"; x.fillText("Leaves left", cx, cy + 18);
   x.font = "12px Arial"; x.fillStyle = "#D8CBA5";
   x.fillText(att.presentDaysThisMonth + " / " + att.totalWorkingDaysInMonth + " days present", cx, cy + r + 34);
@@ -634,7 +634,7 @@ function renderOffice(d) {
         '<div class="bcol"><div class="btop">' + (w.pendingPct > 0 ? w.pendingPct + "% pending" : "✓ done") + '</div><div class="bbox"><div class="bar" style="height:' + ha + 'px;background:#3FA34D"></div></div><div class="bnum">' + w.actual + '</div><div class="bcap">Achieved</div></div>' +
       "</div>";
   } else {
-    weekHtml = '<div class="sub" style="font-size:12px;margin-top:14px">Is hafte ka data abhi nahi mila.</div>';
+    weekHtml = '<div class="sub" style="font-size:12px;margin-top:14px">Data for this week is not available yet.</div>';
   }
   $("dBody").innerHTML =
     '<div class="grid2">' +
@@ -658,7 +658,7 @@ function offTab(t) {
 }
 
 function pendHtml(p) {
-  if (!p.count) return '<div class="card sub" style="text-align:center">🎉 Koi pending kaam nahi.</div>';
+  if (!p.count) return '<div class="card sub" style="text-align:center">🎉 No pending tasks.</div>';
   return '<div class="sub" style="margin-bottom:8px">Total pending: <b style="color:var(--gold)">' + p.count + "</b></div>" +
     p.groups.map(g =>
       '<details class="grp"><summary><span>' + esc(g.task) + "</span><b>" + g.count + "</b></summary>" +
@@ -667,7 +667,7 @@ function pendHtml(p) {
 }
 
 function dailyHtml(a) {
-  if (!a.length) return '<div class="card sub" style="text-align:center">Aaj ka koi task nahi.</div>';
+  if (!a.length) return '<div class="card sub" style="text-align:center">No tasks for today.</div>';
   return a.map(t =>
     '<div class="card titem"><div class="tcode">' + esc(t.code) + (t.date ? " · " + esc(t.date) : "") + "</div>" +
     '<div class="ttext">' + esc(t.task) + "</div>" +
@@ -679,7 +679,7 @@ function dailyHtml(a) {
 function openedList() { try { return JSON.parse(localStorage.getItem("opened") || "[]"); } catch (e) { return []; } }
 function wasOpened(code) { return openedList().indexOf(code) >= 0; }
 function fopen(a) {
-  if (!navigator.onLine) { alert("Form kholne ke liye internet chahiye."); return false; }
+  if (!navigator.onLine) { alert("Internet connection is needed to open the form."); return false; }
   const code = a.dataset.code, l = openedList();
   if (l.indexOf(code) < 0) { l.push(code); while (l.length > 400) l.shift(); try { localStorage.setItem("opened", JSON.stringify(l)); } catch (e) { } }
   a.classList.add("done"); a.textContent = "✓ Form Opened";
@@ -759,7 +759,7 @@ function leaveFormHtml() {
     '<div class="chk"><input type="checkbox" id="lvExcl"><label for="lvExcl" style="margin:0;text-transform:none;letter-spacing:0;font-size:13px">Except Holiday &amp; Week Off</label></div>' +
     '<label>Reason for leave</label><textarea id="lvReason" rows="2"></textarea>' +
     '<label>WhatsApp number</label><input type="tel" id="lvWa" inputmode="numeric" placeholder="e.g. 9876543210" style="margin-bottom:6px">' +
-    '<div class="sub" style="font-size:11px;margin-bottom:16px">Confirmation message isi number par bheja jayega.</div>' +
+    '<div class="sub" style="font-size:11px;margin-bottom:16px">The confirmation message will be sent to this number.</div>' +
     '<button class="btn" id="lvSubmit" onclick="submitLeave()">Submit Leave Request</button>' +
     '<div class="msg" id="lvMsg"></div>';
 }
@@ -772,7 +772,7 @@ function pickLeave(c) {
 
 function onLvPhotos(ev) {
   Array.from(ev.target.files || []).forEach(f => {
-    if (S.lv.photos.length >= 5) { $("lvMsg").textContent = "Maximum 5 photo."; return; }
+    if (S.lv.photos.length >= 5) { $("lvMsg").textContent = "Maximum 5 photos."; return; }
     const rd = new FileReader();
     rd.onload = e => {
       const img = new Image();
@@ -799,10 +799,10 @@ async function submitLeave() {
   const L = S.lv, msg = $("lvMsg"), pf = S.session.profile;
   const start = $("lvStart").value, end = $("lvEnd").value, reason = $("lvReason").value.trim();
   let wa = $("lvWa").value.replace(/\D/g, "");
-  if (!L.type) { msg.textContent = "Leave type chuno."; return; }
-  if (!start || !end) { msg.textContent = "Start aur End date chuno."; return; }
-  if (end < start) { msg.textContent = "End date, Start date se pehle nahi ho sakti."; return; }
-  if (wa.length < 10) { msg.textContent = "Sahi WhatsApp number daalo (10 digit)."; return; }
+  if (!L.type) { msg.textContent = "Please select a leave type."; return; }
+  if (!start || !end) { msg.textContent = "Please select the start and end dates."; return; }
+  if (end < start) { msg.textContent = "End date cannot be before the start date."; return; }
+  if (wa.length < 10) { msg.textContent = "Please enter a valid 10-digit WhatsApp number."; return; }
   if (wa.length > 10 && wa.slice(0, 2) === "91") wa = wa.slice(2);
   wa = wa.slice(-10);
   $("lvSubmit").disabled = true;
@@ -817,14 +817,14 @@ async function submitLeave() {
   S.lv = { type: null, photos: [] };
   $("lvBody").innerHTML =
     '<div class="card" style="text-align:center;margin-bottom:14px"><div style="font-size:30px">✅</div>' +
-    '<p style="margin:8px 0 4px">Leave request save ho gayi.</p>' +
-    '<p class="sub" style="margin:0">' + (navigator.onLine ? "Upload ho rahi hai…" : "Net aate hi apne aap upload ho jayegi.") + "</p></div>" +
+    '<p style="margin:8px 0 4px">Leave request saved.</p>' +
+    '<p class="sub" style="margin:0">' + (navigator.onLine ? "Uploading…" : "It will upload automatically when you are back online.") + "</p></div>" +
     '<a class="btn link" href="https://wa.me/91' + wa + "?text=" + encodeURIComponent(text) + '" target="_blank" rel="noopener" onclick="return fcheck2()">Send Confirmation on WhatsApp</a>' +
     '<button class="btn ghost" style="margin-top:10px" onclick="lvTab(\'m\')">View My Requests</button>';
   render(); sync();
 }
 function fcheck2() {
-  if (!navigator.onLine) { alert("WhatsApp ke liye internet chahiye."); return false; }
+  if (!navigator.onLine) { alert("Internet connection is needed for WhatsApp."); return false; }
   return true;
 }
 
@@ -841,7 +841,7 @@ async function fetchLeaves() {
   if ($("leave").classList.contains("on") && S.lvTab === "m") renderLeaveList();
 }
 function refreshLeaves() {
-  if (!navigator.onLine) { alert("Refresh ke liye internet chahiye."); return; }
+  if (!navigator.onLine) { alert("Internet connection is needed to refresh."); return; }
   fetchLeaves();
 }
 
@@ -863,10 +863,10 @@ async function renderLeaveList() {
     ts: o.ts, type: o.leaveType, start: o.start, end: o.end, reason: o.reason, excl: o.excl ? "Yes" : "No", photos: (o.photos || []).length, status: "__up"
   }));
   const all = pend.concat(srv).sort((a, b) => b.ts - a.ts);
-  const note = navigator.onLine ? "" : '<div class="sub" style="font-size:11px;margin:0 0 8px">Offline — aakhri saved list dikh rahi hai.</div>';
+  const note = navigator.onLine ? "" : '<div class="sub" style="font-size:11px;margin:0 0 8px">Offline — showing the last saved list.</div>';
   if (!all.length) {
     $("lvBody").innerHTML = note + '<div class="card sub" style="text-align:center">' +
-      (S.leaves === null && navigator.onLine ? "Loading…" : S.leaves === null ? "Net aate hi list dikhegi." : "Abhi koi leave request nahi.") + "</div>";
+      (S.leaves === null && navigator.onLine ? "Loading…" : S.leaves === null ? "The list will appear once you are online." : "No leave requests yet.") + "</div>";
     return;
   }
   $("lvBody").innerHTML = note + all.map(x => {
@@ -883,7 +883,7 @@ async function renderLeaveList() {
   const ca = Number(localStorage.getItem("camAt")) || 0;
   if (ca && Date.now() - ca < 180000) {      // the page restarted while the camera was open
     logEvt("PAGE RELOADED right after camera was opened");
-    S.err = "Camera ke dauran app reload hua tha — photo dobara lein.";
+    S.err = "The app reloaded while the camera was open — please take the photo again.";
   }
   localStorage.removeItem("camAt");
   const s = await kvGet("session"), back = localStorage.getItem("scr");
