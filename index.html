@@ -78,6 +78,32 @@ details.grp summary b{background:var(--gold);color:var(--ink);border-radius:20px
 .titem{padding:14px;margin-bottom:10px}
 .tcode{font-size:11px;color:var(--mut);margin-bottom:4px}
 .ttext{font-size:14px;margin-bottom:12px;line-height:1.4}
+
+/* ---- Leave ---- */
+textarea{width:100%;padding:14px;font:inherit;font-size:16px;border-radius:10px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);color:var(--cream);outline:none;margin-bottom:16px;resize:vertical}
+textarea:focus{border-color:var(--gold)}
+input[type=date]{color-scheme:dark}
+.lgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px}
+.lbtn{padding:12px 4px;border-radius:10px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.04);color:var(--cream);font-size:13px;font-weight:700;text-align:center;cursor:pointer}
+.lbtn small{display:block;font-weight:400;font-size:9px;color:#8A8270;margin-top:2px}
+.lbtn.on{background:var(--gold);color:var(--ink);border-color:var(--gold)}
+.lbtn.on small{color:rgba(20,18,14,.65)}
+.thumbs{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.th{position:relative}.th img{width:64px;height:64px;object-fit:cover;border-radius:8px;border:1px solid rgba(240,180,41,.3)}
+.th span{position:absolute;right:-6px;top:-6px;width:20px;height:20px;border-radius:50%;background:#D64545;color:#fff;font-size:13px;line-height:20px;text-align:center;cursor:pointer}
+.chk{display:flex;align-items:center;gap:10px;margin:2px 0 16px;font-size:13px;color:var(--mut)}
+.chk input{width:18px;height:18px;margin:0;flex:none}
+.lit{background:rgba(255,255,255,.03);border:1px solid rgba(240,180,41,.15);border-radius:12px;padding:12px 14px;margin-bottom:10px}
+.lh{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.lh b{color:var(--gold);font-size:14px}.lh span{font-size:12px;color:#D8CBA5}
+.lr{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:8px}
+.lrt{font-size:12px;color:var(--mut);flex:1;min-width:0;word-break:break-word}
+.st{flex:none;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap}
+.st.yes{background:#3FA34D;color:#fff}
+.st.can{background:#F28B82;color:#14120E}
+.st.no{background:#C62828;color:#fff}
+.st.pend{background:rgba(240,180,41,.18);color:var(--gold)}
+.st.up{background:rgba(255,255,255,.1);color:var(--mut)}
 </style>
 </head>
 <body>
@@ -110,7 +136,7 @@ details.grp summary b{background:var(--gold);color:var(--ink);border-radius:20px
       <div class="tile off"><span>🗺️</span>Market Visit</div>
       <div class="tile off"><span>🧾</span>Expense</div>
       <div class="tile off"><span>📋</span>My Orders</div>
-      <div class="tile off"><span>🗓️</span>Leave</div>
+      <button class="tile" id="tLeave" onclick="openLeave()"><span>🗓️</span>Leave</button>
     </div>
     <button class="btn ghost" onclick="signOut()">Sign out</button>
     <div class="msg" id="homeMsg"></div>
@@ -125,6 +151,15 @@ details.grp summary b{background:var(--gold);color:var(--ink);border-radius:20px
     </div>
     <div class="sub" id="dUpd" style="text-align:center;margin:0 0 12px"></div>
     <div id="dBody"></div>
+  </div>
+
+  <div id="leave" class="screen">
+    <div class="dhead">
+      <button class="btn ghost" onclick="show('home');render()">← Back</button>
+      <button class="btn ghost" id="lvRef" onclick="refreshLeaves()" style="display:none">⟳ Refresh</button>
+    </div>
+    <div class="row2" id="lvTabs"></div>
+    <div id="lvBody"></div>
   </div>
 
   <div id="att" class="screen">
@@ -159,7 +194,7 @@ const OFFLINE_DAYS = 15;                        // longest time the app may run 
 const DASH_STALE_MS = 600000;                   // opening the Dashboard re-fetches if the saved copy is older than 10 min
 
 const $ = id => document.getElementById(id);
-const S = { session: null, busy: false, needLogin: false, err: "", coords: null, photo: null, proc: false, dash: null, dashBusy: false, dRange: "3", dTab: "p" };
+const S = { session: null, busy: false, needLogin: false, err: "", coords: null, photo: null, proc: false, dash: null, dashBusy: false, dRange: "3", dTab: "p", leaves: null, lvBusy: false, lvTab: "a", lv: { type: null, photos: [] } };
 const dayKey = ts => new Date(ts).toLocaleDateString("en-CA"); // yyyy-mm-dd
 const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
@@ -203,7 +238,7 @@ const wipeAll = () => dbp.then(db => new Promise(res => {
 /* ===== SCREEN HELPERS ===== */
 function show(id) {
   document.querySelectorAll(".screen").forEach(e => e.classList.toggle("on", e.id === id));
-  $("appBox").classList.toggle("top", id === "dash");
+  $("appBox").classList.toggle("top", id === "dash" || id === "leave");
   if (id === "home" || id === "att") localStorage.setItem("scr", id);
 }
 
@@ -215,7 +250,7 @@ async function derive() {
   let open = snap.open;
   ops.forEach(o => {
     if (o.type === "login") { open = { entryId: o.entryId, date: dayKey(o.ts), loginTs: o.ts }; present.add(dayKey(o.ts)); }
-    else open = null;
+    else if (o.type === "logout") open = null;
   });
   if (open && open.date !== today) open = null; // an old open session never blocks today
   const ym = today.slice(0, 7);
@@ -243,6 +278,7 @@ async function render() {
   $("hi").textContent = "Welcome, " + pf.name.split(" ")[0] + "!";
   $("sum").innerHTML = sumHtml(st);
   $("tAtt").classList.toggle("off", !pf.attendanceAccess);
+  $("tLeave").classList.toggle("off", pf.leaveAccess === false);
 
   let t = "", warn = false;
   if (S.needLogin) { t = "🔒 Session ended. Tap here to login again — your saved entries are safe."; warn = true; }
@@ -252,6 +288,7 @@ async function render() {
   $("pill").textContent = t;
   $("pill").className = "pill" + (t ? " on" : "") + (warn ? " warn" : "");
   if ($("att").classList.contains("on")) renderAtt(st);
+  if ($("leave").classList.contains("on") && S.lvTab === "m") renderLeaveList();
 }
 
 function pillTap() { if (S.needLogin) show("login"); }
@@ -273,8 +310,9 @@ async function doLogin() {
     await kvSet("session", S.session); await kvSet("snap", r.attendance); await kvSet("holidays", r.holidays);
     await kvSet("wipe", false); await kvSet("lastOnline", Date.now()); S.needLogin = false; S.err = ""; $("p").value = "";
     S.dash = null; await kvSet("dash", null);   // never show a previous user's dashboard
+    S.leaves = null; await kvSet("leaves", null);
     if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
-    show("home"); render(); sync(); fetchDash();
+    show("home"); render(); sync(); fetchDash(); fetchLeaves();
   } catch (e) {
     msg.textContent = "No internet. The first login of the day needs net.";
   } finally { btn.disabled = false; btn.textContent = "Login"; }
@@ -293,6 +331,7 @@ async function sync() {
     else if (r.ok) {
       for (const x of r.results) if (x.ok) await outDel(x.opId);
       await kvSet("snap", r.attendance); await kvSet("lastOnline", Date.now());
+      if (r.leaves) { S.leaves = r.leaves; await kvSet("leaves", r.leaves); }
       S.needLogin = false;
       const bad = r.results.find(x => !x.ok); S.err = bad ? bad.message : "";
     } else S.err = r.message || "";
@@ -304,7 +343,7 @@ async function sync() {
 /* Clear the phone only when nothing is left waiting */
 async function afterSync() {
   if ((await outAll()).length === 0 && (await kvGet("wipe"))) {
-    await wipeAll(); S.session = null; S.dash = null; S.err = "";
+    await wipeAll(); S.session = null; S.dash = null; S.leaves = null; S.err = "";
     $("pill").className = "pill"; show("login");
   }
 }
@@ -402,7 +441,7 @@ async function maybeRefresh(force) {
     }
   } catch (e) { /* no net: keep working from the phone */ }
   S.busy = false; render();
-  if (refreshed) fetchDash();   // the dashboard is refreshed together with the hourly refresh
+  if (refreshed) { fetchDash(); fetchLeaves(); }   // dashboard and leave statuses refresh together with the hourly refresh
 }
 
 async function checkGate() {
@@ -680,6 +719,164 @@ function drawLeave(canvas, bal, max) {
   x.font = "10px Arial"; x.fillStyle = "#B8AF9B"; x.fillText("left", cx, cy + 20);
 }
 
+/* ===== LEAVE ===== */
+const LEAVE_TYPES = [
+  { c: "CL", s: "Casual Leave" }, { c: "SL", s: "Sick Leave" },
+  { c: "HD1", s: "Half Day (10-14)" }, { c: "HD2", s: "Half Day (14-19)" }, { c: "W/O", s: "Week Off" }
+];
+const fmtLv = s => {
+  const m = String(s || "").match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? new Date(+m[1], +m[2] - 1, +m[3]).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : String(s || "");
+};
+
+function openLeave() {
+  S.lv = { type: null, photos: [] }; S.lvTab = "a";
+  show("leave"); renderLeave(); fetchLeaves();
+}
+function lvTab(t) { S.lvTab = t; renderLeave(); }
+
+function renderLeave() {
+  $("lvTabs").innerHTML =
+    '<button class="tabbtn' + (S.lvTab === "a" ? " on" : "") + '" onclick="lvTab(\'a\')">Apply Leave</button>' +
+    '<button class="tabbtn' + (S.lvTab === "m" ? " on" : "") + '" onclick="lvTab(\'m\')">My Requests</button>';
+  $("lvRef").style.display = S.lvTab === "m" ? "" : "none";
+  if (S.lvTab === "a") {
+    $("lvBody").innerHTML = leaveFormHtml();
+    const w = localStorage.getItem("lvWa"); if (w) $("lvWa").value = w;   // last WhatsApp number is remembered
+  } else renderLeaveList();
+}
+
+function leaveFormHtml() {
+  const types = LEAVE_TYPES.map(t =>
+    '<div class="lbtn' + (S.lv.type === t.c ? " on" : "") + '" data-t="' + t.c + '" onclick="pickLeave(\'' + t.c + '\')">' + t.c + "<small>" + t.s + "</small></div>").join("");
+  return '<div class="lgrid">' + types + "</div>" +
+    '<div id="lvPhotoWrap" style="display:none;margin-bottom:16px">' +
+      '<button type="button" class="cap" onclick="$(\'lvPhotos\').click()">📎 Add photo (optional — prescription / document)</button>' +
+      '<input id="lvPhotos" type="file" accept="image/*" multiple hidden onchange="onLvPhotos(event)"><div class="thumbs" id="lvThumbs"></div>' +
+    "</div>" +
+    '<div class="row2"><div style="flex:1;min-width:0"><label>Start date</label><input type="date" id="lvStart" style="margin:0"></div>' +
+    '<div style="flex:1;min-width:0"><label>End date</label><input type="date" id="lvEnd" style="margin:0"></div></div>' +
+    '<div class="chk"><input type="checkbox" id="lvExcl"><label for="lvExcl" style="margin:0;text-transform:none;letter-spacing:0;font-size:13px">Except Holiday &amp; Week Off</label></div>' +
+    '<label>Reason for leave</label><textarea id="lvReason" rows="2"></textarea>' +
+    '<label>WhatsApp number</label><input type="tel" id="lvWa" inputmode="numeric" placeholder="e.g. 9876543210" style="margin-bottom:6px">' +
+    '<div class="sub" style="font-size:11px;margin-bottom:16px">Confirmation message isi number par bheja jayega.</div>' +
+    '<button class="btn" id="lvSubmit" onclick="submitLeave()">Submit Leave Request</button>' +
+    '<div class="msg" id="lvMsg"></div>';
+}
+
+function pickLeave(c) {
+  S.lv.type = c;
+  document.querySelectorAll(".lbtn").forEach(b => b.classList.toggle("on", b.dataset.t === c));
+  $("lvPhotoWrap").style.display = c === "SL" ? "block" : "none";
+}
+
+function onLvPhotos(ev) {
+  Array.from(ev.target.files || []).forEach(f => {
+    if (S.lv.photos.length >= 5) { $("lvMsg").textContent = "Maximum 5 photo."; return; }
+    const rd = new FileReader();
+    rd.onload = e => {
+      const img = new Image();
+      img.onload = () => {
+        const w = Math.min(1000, img.width), h = Math.round(img.height * w / img.width);
+        const c = document.createElement("canvas"); c.width = w; c.height = h;
+        c.getContext("2d").drawImage(img, 0, 0, w, h);
+        if (S.lv.photos.length < 5) S.lv.photos.push(c.toDataURL("image/jpeg", 0.6));
+        drawLvThumbs();
+      };
+      img.src = e.target.result;
+    };
+    rd.readAsDataURL(f);
+  });
+  ev.target.value = "";
+}
+function drawLvThumbs() {
+  const t = $("lvThumbs"); if (!t) return;
+  t.innerHTML = S.lv.photos.map((p, i) => '<div class="th"><img src="' + p + '"><span onclick="rmLvPhoto(' + i + ')">×</span></div>').join("");
+}
+function rmLvPhoto(i) { S.lv.photos.splice(i, 1); drawLvThumbs(); }
+
+async function submitLeave() {
+  const L = S.lv, msg = $("lvMsg"), pf = S.session.profile;
+  const start = $("lvStart").value, end = $("lvEnd").value, reason = $("lvReason").value.trim();
+  let wa = $("lvWa").value.replace(/\D/g, "");
+  if (!L.type) { msg.textContent = "Leave type chuno."; return; }
+  if (!start || !end) { msg.textContent = "Start aur End date chuno."; return; }
+  if (end < start) { msg.textContent = "End date, Start date se pehle nahi ho sakti."; return; }
+  if (wa.length < 10) { msg.textContent = "Sahi WhatsApp number daalo (10 digit)."; return; }
+  if (wa.length > 10 && wa.slice(0, 2) === "91") wa = wa.slice(2);
+  wa = wa.slice(-10);
+  $("lvSubmit").disabled = true;
+  const op = {
+    opId: crypto.randomUUID(), type: "leave", entryId: crypto.randomUUID(), ts: Date.now(),
+    leaveType: L.type, start: start, end: end, excl: $("lvExcl").checked, reason: reason, wa: wa,
+    photos: L.type === "SL" ? L.photos.slice() : []
+  };
+  await outPut(op);                       // saved on the phone first — works with any net
+  localStorage.setItem("lvWa", wa);
+  const text = "Leave request: " + L.type + " from " + fmtLv(start) + " to " + fmtLv(end) + ". — " + pf.name;
+  S.lv = { type: null, photos: [] };
+  $("lvBody").innerHTML =
+    '<div class="card" style="text-align:center;margin-bottom:14px"><div style="font-size:30px">✅</div>' +
+    '<p style="margin:8px 0 4px">Leave request save ho gayi.</p>' +
+    '<p class="sub" style="margin:0">' + (navigator.onLine ? "Upload ho rahi hai…" : "Net aate hi apne aap upload ho jayegi.") + "</p></div>" +
+    '<a class="btn link" href="https://wa.me/91' + wa + "?text=" + encodeURIComponent(text) + '" target="_blank" rel="noopener" onclick="return fcheck2()">Send Confirmation on WhatsApp</a>' +
+    '<button class="btn ghost" style="margin-top:10px" onclick="lvTab(\'m\')">View My Requests</button>';
+  render(); sync();
+}
+function fcheck2() {
+  if (!navigator.onLine) { alert("WhatsApp ke liye internet chahiye."); return false; }
+  return true;
+}
+
+async function fetchLeaves() {
+  if (S.lvBusy || !S.session || !navigator.onLine) return;
+  S.lvBusy = true;
+  try {
+    const r = await api({ action: "leaveList", token: S.session.token });
+    if (r.auth === false) S.needLogin = true;
+    else if (r.ok) { S.leaves = r.leaves; await kvSet("leaves", r.leaves); }
+  } catch (e) { /* offline or weak net: keep the saved list */ }
+  S.lvBusy = false;
+  render();
+  if ($("leave").classList.contains("on") && S.lvTab === "m") renderLeaveList();
+}
+function refreshLeaves() {
+  if (!navigator.onLine) { alert("Refresh ke liye internet chahiye."); return; }
+  fetchLeaves();
+}
+
+/* Status colours (same as the Sheet): Approved = green, Cancel = light red, Not Approved = dark red, blank = Pending */
+function statusInfo(s) {
+  const t = String(s || "").trim(), l = t.toLowerCase();
+  if (l === "__up") return { c: "up", l: "Uploading…" };
+  if (!t) return { c: "pend", l: "Pending" };
+  if (l.indexOf("not") >= 0) return { c: "no", l: t };
+  if (l.indexOf("cancel") >= 0) return { c: "can", l: t };
+  if (l.indexOf("approv") >= 0) return { c: "yes", l: t };
+  return { c: "pend", l: t };
+}
+
+async function renderLeaveList() {
+  const ops = (await outAll()).filter(o => o.type === "leave");
+  const srv = S.leaves || [], have = new Set(srv.map(x => x.id));
+  const pend = ops.filter(o => !have.has(o.entryId)).map(o => ({
+    ts: o.ts, type: o.leaveType, start: o.start, end: o.end, reason: o.reason, excl: o.excl ? "Yes" : "No", photos: (o.photos || []).length, status: "__up"
+  }));
+  const all = pend.concat(srv).sort((a, b) => b.ts - a.ts);
+  const note = navigator.onLine ? "" : '<div class="sub" style="font-size:11px;margin:0 0 8px">Offline — aakhri saved list dikh rahi hai.</div>';
+  if (!all.length) {
+    $("lvBody").innerHTML = note + '<div class="card sub" style="text-align:center">' +
+      (S.leaves === null && navigator.onLine ? "Loading…" : S.leaves === null ? "Net aate hi list dikhegi." : "Abhi koi leave request nahi.") + "</div>";
+    return;
+  }
+  $("lvBody").innerHTML = note + all.map(x => {
+    const st = statusInfo(x.status);
+    return '<div class="lit"><div class="lh"><b>' + esc(x.type) + "</b><span>" + esc(fmtLv(x.start)) + " → " + esc(fmtLv(x.end)) + "</span></div>" +
+      (x.excl === "Yes" ? '<div class="sub" style="font-size:11px">Except Holiday &amp; Week Off</div>' : "") +
+      '<div class="lr"><div class="lrt">' + esc(x.reason || "—") + (x.photos ? " · 📎 " + x.photos : "") + '</div><span class="st ' + st.c + '">' + esc(st.l) + "</span></div></div>";
+  }).join("");
+}
+
 /* ===== START ===== */
 (async function () {
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
@@ -691,6 +888,7 @@ function drawLeave(canvas, bal, max) {
   localStorage.removeItem("camAt");
   const s = await kvGet("session"), back = localStorage.getItem("scr");
   S.dash = (await kvGet("dash")) || null;
+  S.leaves = (await kvGet("leaves")) || null;
   if (s) { S.session = s; if (await checkGate()) retryGate(); else { show("home"); render(); sync(); if (back === "att") openAtt(); } } else show("login");
   addEventListener("online", () => $("gate").classList.contains("on") ? retryGate() : sync());
   addEventListener("offline", render);
