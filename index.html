@@ -588,6 +588,7 @@ function drawSales() {
 }
 
 function togglePW() {
+  if (S.dash && S.dash.noParty) { $("pwMsg").style.color = ""; $("pwMsg").textContent = "No party wise data available."; return; }   // Assam sales have no party details
   const row = $("pwRow"), open = row.style.display !== "none";
   row.style.display = open ? "none" : "flex";
   if (open) drawSales();
@@ -604,7 +605,7 @@ async function showPW() {
     if (r.auth === false) { S.needLogin = true; render(); msg.textContent = ""; return; }
     msg.style.color = "";
     if (!r.ok) { msg.textContent = r.message || "Something went wrong."; return; }
-    if (!r.parties.length) { msg.textContent = "No party sales found for this period."; return; }
+    if (!r.parties.length) { msg.textContent = r.note || "No party sales found for this period."; return; }
     msg.textContent = "";
     $("dChartTitle").textContent = "PARTY WISE SALES (TN)";
     drawBars($("cSales"), r.parties.map(p => ({ month: p.name.length > 10 ? p.name.slice(0, 10) + "…" : p.name, achieved: p.achieved, target: p.target, percentage: p.percentage })));
