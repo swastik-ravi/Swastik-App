@@ -104,6 +104,18 @@ input[type=date]{color-scheme:dark}
 .st.no{background:#C62828;color:#fff}
 .st.pend{background:rgba(240,180,41,.18);color:var(--gold)}
 .st.up{background:rgba(255,255,255,.1);color:var(--mut)}
+
+/* ---- Assam Sale ---- */
+.btn.small{padding:11px;font-size:14px;margin-bottom:10px}
+.btn.dis{opacity:.4;pointer-events:none}
+.asd{margin-bottom:12px;border:1px solid rgba(240,180,41,.18);border-radius:12px;overflow:hidden;background:rgba(255,255,255,.03)}
+.asd .ah{padding:9px 12px;font-size:13px;font-weight:700;color:var(--gold);background:rgba(240,180,41,.08)}
+.asd.sun .ah{background:rgba(214,69,69,.22);color:#F4A0A0}
+.asr{display:grid;grid-template-columns:58px 1fr 1fr 42px;gap:6px;align-items:center;padding:8px 10px;border-top:1px solid rgba(255,255,255,.06);font-size:13px}
+.asr input{margin:0;padding:9px 8px;font-size:14px;min-width:0}
+.asr .sv{padding:9px 0;font-size:16px;width:auto}
+.asr .val{grid-column:2 / 5;color:#D8CBA5}
+.asr .val i{font-style:normal;color:var(--mut);font-size:11px}
 </style>
 </head>
 <body>
@@ -138,6 +150,7 @@ input[type=date]{color-scheme:dark}
       <div class="tile off"><span>📋</span>My Orders</div>
       <button class="tile" id="tLeave" onclick="openLeave()"><span>🗓️</span>Leave</button>
     </div>
+    <button class="btn ghost small" id="bAssam" onclick="openAssam()">Assam Sale</button>
     <button class="btn ghost" onclick="signOut()">Sign out</button>
     <div class="msg" id="homeMsg"></div>
   </div>
@@ -160,6 +173,15 @@ input[type=date]{color-scheme:dark}
     </div>
     <div class="row2" id="lvTabs"></div>
     <div id="lvBody"></div>
+  </div>
+
+  <div id="assam" class="screen">
+    <div class="dhead">
+      <button class="btn ghost" onclick="show('home');render()">← Back</button>
+      <button class="btn ghost" id="asRef" onclick="refreshAssam()">⟳ Refresh</button>
+    </div>
+    <div class="dtitle" id="asTitle" style="margin-top:4px"></div>
+    <div id="asBody"></div>
   </div>
 
   <div id="att" class="screen">
@@ -194,7 +216,7 @@ const OFFLINE_DAYS = 15;                        // longest time the app may run 
 const DASH_STALE_MS = 600000;                   // opening the Dashboard re-fetches if the saved copy is older than 10 min
 
 const $ = id => document.getElementById(id);
-const S = { session: null, busy: false, needLogin: false, err: "", coords: null, photo: null, proc: false, dash: null, dashBusy: false, dRange: "3", dTab: "p", leaves: null, lvBusy: false, lvTab: "a", lv: { type: null, photos: [] } };
+const S = { session: null, busy: false, needLogin: false, err: "", coords: null, photo: null, proc: false, dash: null, dashBusy: false, dRange: "3", dTab: "p", leaves: null, lvBusy: false, lvTab: "a", lv: { type: null, photos: [] }, assam: null, asBusy: false, asd: {}, asScroll: false };
 const dayKey = ts => new Date(ts).toLocaleDateString("en-CA"); // yyyy-mm-dd
 const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
@@ -238,7 +260,7 @@ const wipeAll = () => dbp.then(db => new Promise(res => {
 /* ===== SCREEN HELPERS ===== */
 function show(id) {
   document.querySelectorAll(".screen").forEach(e => e.classList.toggle("on", e.id === id));
-  $("appBox").classList.toggle("top", id === "dash" || id === "leave");
+  $("appBox").classList.toggle("top", id === "dash" || id === "leave" || id === "assam");
   if (id === "home" || id === "att") localStorage.setItem("scr", id);
 }
 
@@ -279,6 +301,7 @@ async function render() {
   $("sum").innerHTML = sumHtml(st);
   $("tAtt").classList.toggle("off", !pf.attendanceAccess);
   $("tLeave").classList.toggle("off", pf.leaveAccess === false);
+  $("bAssam").classList.toggle("dis", !pf.assamAccess);
 
   let t = "", warn = false;
   if (S.needLogin) { t = "🔒 Session ended. Tap here to login again — your saved entries are safe."; warn = true; }
@@ -289,6 +312,7 @@ async function render() {
   $("pill").className = "pill" + (t ? " on" : "") + (warn ? " warn" : "");
   if ($("att").classList.contains("on")) renderAtt(st);
   if ($("leave").classList.contains("on") && S.lvTab === "m") renderLeaveList();
+  if ($("assam").classList.contains("on")) renderAssam();
 }
 
 function pillTap() { if (S.needLogin) show("login"); }
@@ -311,8 +335,9 @@ async function doLogin() {
     await kvSet("wipe", false); await kvSet("lastOnline", Date.now()); S.needLogin = false; S.err = ""; $("p").value = "";
     S.dash = null; await kvSet("dash", null);   // never show a previous user's dashboard
     S.leaves = null; await kvSet("leaves", null);
+    S.assam = null; await kvSet("assam", null);
     if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
-    show("home"); render(); sync(); fetchDash(); fetchLeaves();
+    show("home"); render(); sync(); fetchDash(); fetchLeaves(); fetchAssam();
   } catch (e) {
     msg.textContent = "No internet. The first login of the day needs net.";
   } finally { btn.disabled = false; btn.textContent = "Login"; }
@@ -329,9 +354,10 @@ async function sync() {
     const r = await api({ action: "sync", token: S.session.token, ops });
     if (r.auth === false) S.needLogin = true;
     else if (r.ok) {
-      for (const x of r.results) if (x.ok) await outDel(x.opId);
+      for (const x of r.results) if (x.ok || x.drop) await outDel(x.opId);
       await kvSet("snap", r.attendance); await kvSet("lastOnline", Date.now());
       if (r.leaves) { S.leaves = r.leaves; await kvSet("leaves", r.leaves); }
+      if (r.assam) { S.assam = r.assam; await kvSet("assam", r.assam); }
       S.needLogin = false;
       const bad = r.results.find(x => !x.ok); S.err = bad ? bad.message : "";
     } else S.err = r.message || "";
@@ -343,7 +369,7 @@ async function sync() {
 /* Clear the phone only when nothing is left waiting */
 async function afterSync() {
   if ((await outAll()).length === 0 && (await kvGet("wipe"))) {
-    await wipeAll(); S.session = null; S.dash = null; S.leaves = null; S.err = "";
+    await wipeAll(); S.session = null; S.dash = null; S.leaves = null; S.assam = null; S.err = "";
     $("pill").className = "pill"; show("login");
   }
 }
@@ -441,7 +467,7 @@ async function maybeRefresh(force) {
     }
   } catch (e) { /* no net: keep working from the phone */ }
   S.busy = false; render();
-  if (refreshed) { fetchDash(); fetchLeaves(); }   // dashboard and leave statuses refresh together with the hourly refresh
+  if (refreshed) { fetchDash(); fetchLeaves(); fetchAssam(); }   // dashboard and leave statuses refresh together with the hourly refresh
 }
 
 async function checkGate() {
@@ -877,6 +903,82 @@ async function renderLeaveList() {
   }).join("");
 }
 
+/* ===== ASSAM SALE ===== */
+const dayName = d => { const m = String(d).match(/^(\d{4})-(\d{2})-(\d{2})$/); return m ? new Date(+m[1], +m[2] - 1, +m[3]).toLocaleDateString("en-GB", { weekday: "long" }) : ""; };
+const dayNum = d => { const m = String(d).match(/^(\d{4})-(\d{2})-(\d{2})$/); return m ? new Date(+m[1], +m[2] - 1, +m[3]).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : d; };
+const money = n => typeof n === "number" ? n.toLocaleString("en-IN") : String(n);
+
+function openAssam() {
+  if (!S.session.profile.assamAccess) return;
+  S.asScroll = true;
+  show("assam"); renderAssam(); fetchAssam();
+}
+function refreshAssam() {
+  if (!navigator.onLine) { alert("Internet connection is needed to refresh."); return; }
+  fetchAssam();
+}
+
+async function fetchAssam() {
+  if (S.asBusy || !S.session || !S.session.profile.assamAccess || !navigator.onLine) return;
+  S.asBusy = true;
+  try {
+    const r = await api({ action: "assamList", token: S.session.token });
+    if (r.auth === false) S.needLogin = true;
+    else if (r.ok) { S.assam = r.rows; await kvSet("assam", r.rows); }
+  } catch (e) { /* offline or weak net: keep the saved list */ }
+  S.asBusy = false;
+  render();
+}
+
+async function renderAssam() {
+  $("asTitle").textContent = "ASSAM SALE · " + new Date().toLocaleDateString("en-GB", { month: "long", year: "numeric" }).toUpperCase();
+  const list = S.assam, body = $("asBody");
+  if (!list) { body.innerHTML = '<div class="card sub" style="text-align:center">' + (navigator.onLine ? "Loading…" : "Open this screen once while online to load the sheet.") + "</div>"; return; }
+  if (!list.length) { body.innerHTML = '<div class="card sub" style="text-align:center">No rows found for this month.</div>'; return; }
+
+  const pend = {};
+  (await outAll()).filter(o => o.type === "assam").forEach(o => { pend[o.uid.toUpperCase() + "|" + o.date] = o; });
+  const today = dayKey(Date.now()), groups = [];
+  list.forEach((e, i) => {
+    let g = groups[groups.length - 1];
+    if (!g || g.date !== e.date) { g = { date: e.date, rows: [] }; groups.push(g); }
+    g.rows.push({ e: e, i: i });
+  });
+
+  body.innerHTML = groups.map(g => {
+    const sun = dayName(g.date) === "Sunday";
+    return '<div class="asd' + (sun ? " sun" : "") + '"' + (g.date === today ? ' id="asToday"' : "") + '><div class="ah">' + esc(dayNum(g.date)) + " · " + esc(dayName(g.date)) + (g.date === today ? " · Today" : "") + "</div>" +
+      g.rows.map(x => {
+        const e = x.e, i = x.i, k = e.id + "|" + e.date, p = pend[e.id.toUpperCase() + "|" + e.date];
+        const nm = '<div><b style="color:var(--cream)">' + esc((e.name || e.id).split(" ")[0]) + "</b></div>";
+        if (e.qty !== null || e.amt !== null) return '<div class="asr">' + nm + '<div class="val">' + esc(e.qty === null ? "-" : e.qty) + " Ton · ₹" + esc(e.amt === null ? "-" : money(e.amt)) + "</div></div>";
+        if (p) return '<div class="asr">' + nm + '<div class="val">' + esc(p.qty) + " Ton · ₹" + esc(money(p.amt)) + " <i>⏳ waiting to upload</i></div></div>";
+        const d = S.asd[k] || {};
+        return '<div class="asr">' + nm +
+          '<input type="number" inputmode="decimal" step="any" min="0" id="aq' + i + '" placeholder="Qty (Ton)" value="' + esc(d.q || "") + '" oninput="asDraft(' + i + ')">' +
+          '<input type="number" inputmode="decimal" step="any" min="0" id="aa' + i + '" placeholder="Amount ₹" value="' + esc(d.a || "") + '" oninput="asDraft(' + i + ')">' +
+          '<button class="btn sv" onclick="asSave(' + i + ')">✓</button></div>';
+      }).join("") + "</div>";
+  }).join("");
+
+  if (S.asScroll) { const t = $("asToday"); if (t) t.scrollIntoView({ block: "start" }); S.asScroll = false; }
+}
+
+function asDraft(i) {   // keeps what is being typed when the list refreshes in the background
+  const e = S.assam[i];
+  S.asd[e.id + "|" + e.date] = { q: $("aq" + i).value, a: $("aa" + i).value };
+}
+
+async function asSave(i) {
+  const e = S.assam[i], q = $("aq" + i).value.trim(), a = $("aa" + i).value.trim();
+  if (q === "" || a === "") { alert("Please enter both Qty and Approx Amount."); return; }
+  if (isNaN(Number(q)) || isNaN(Number(a)) || Number(q) < 0 || Number(a) < 0) { alert("Qty and Amount must be numbers."); return; }
+  if (!confirm("Save for " + (e.name || e.id) + " on " + dayNum(e.date) + "?\n\nQty: " + q + " Ton\nAmount: ₹" + a + "\n\nThis cannot be changed after saving.")) return;
+  await outPut({ opId: crypto.randomUUID(), type: "assam", entryId: crypto.randomUUID(), ts: Date.now(), uid: e.id, date: e.date, name: e.name, qty: Number(q), amt: Number(a) });
+  delete S.asd[e.id + "|" + e.date];
+  render(); sync();
+}
+
 /* ===== START ===== */
 (async function () {
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
@@ -889,6 +991,7 @@ async function renderLeaveList() {
   const s = await kvGet("session"), back = localStorage.getItem("scr");
   S.dash = (await kvGet("dash")) || null;
   S.leaves = (await kvGet("leaves")) || null;
+  S.assam = (await kvGet("assam")) || null;
   if (s) { S.session = s; if (await checkGate()) retryGate(); else { show("home"); render(); sync(); if (back === "att") openAtt(); } } else show("login");
   addEventListener("online", () => $("gate").classList.contains("on") ? retryGate() : sync());
   addEventListener("offline", render);
