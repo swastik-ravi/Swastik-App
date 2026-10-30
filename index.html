@@ -108,6 +108,9 @@ input[type=date]{color-scheme:dark}
 /* ---- Assam Sale ---- */
 .btn.small{padding:11px;font-size:14px;margin-bottom:10px}
 .btn.dis{opacity:.4;pointer-events:none}
+.btn.ghost.on{background:var(--gold);color:var(--ink);border-color:var(--gold)}
+select option,select optgroup{background:#1C1913;color:var(--cream)}
+.dhead{gap:8px}
 .asd{margin-bottom:12px;border:1px solid rgba(240,180,41,.18);border-radius:12px;overflow:hidden;background:rgba(255,255,255,.03)}
 .asd .ah{padding:9px 12px;font-size:13px;font-weight:700;color:var(--gold);background:rgba(240,180,41,.08)}
 .asd.sun .ah{background:rgba(214,69,69,.22);color:#F4A0A0}
@@ -160,6 +163,7 @@ input[type=date]{color-scheme:dark}
   <div id="dash" class="screen">
     <div class="dhead">
       <button class="btn ghost" onclick="show('home');render()">← Back</button>
+      <button class="btn ghost" id="dAdm" onclick="openAdmin()">ADMIN</button>
       <button class="btn ghost" id="dRef" onclick="refreshDash()">⟳ Refresh</button>
     </div>
     <div class="sub" id="dUpd" style="text-align:center;margin:0 0 12px"></div>
@@ -216,7 +220,7 @@ const OFFLINE_DAYS = 15;                        // longest time the app may run 
 const DASH_STALE_MS = 600000;                   // opening the Dashboard re-fetches if the saved copy is older than 10 min
 
 const $ = id => document.getElementById(id);
-const S = { session: null, busy: false, needLogin: false, err: "", coords: null, photo: null, proc: false, dash: null, dashBusy: false, dRange: "3", dTab: "p", leaves: null, lvBusy: false, lvTab: "a", lv: { type: null, photos: [] }, assam: null, asBusy: false, asd: {}, asScroll: false };
+const S = { session: null, busy: false, needLogin: false, err: "", coords: null, photo: null, proc: false, dash: null, dashBusy: false, dRange: "3", dTab: "p", leaves: null, lvBusy: false, lvTab: "a", lv: { type: null, photos: [] }, assam: null, asBusy: false, asd: {}, asScroll: false, dMode: "mine", adm: null };
 const dayKey = ts => new Date(ts).toLocaleDateString("en-CA"); // yyyy-mm-dd
 const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
@@ -302,6 +306,7 @@ async function render() {
   $("tAtt").classList.toggle("off", !pf.attendanceAccess);
   $("tLeave").classList.toggle("off", pf.leaveAccess === false);
   $("bAssam").classList.toggle("dis", !pf.assamAccess);
+  $("dAdm").classList.toggle("dis", !pf.isAdmin);
 
   let t = "", warn = false;
   if (S.needLogin) { t = "🔒 Session ended. Tap here to login again — your saved entries are safe."; warn = true; }
@@ -335,7 +340,7 @@ async function doLogin() {
     await kvSet("wipe", false); await kvSet("lastOnline", Date.now()); S.needLogin = false; S.err = ""; $("p").value = "";
     S.dash = null; await kvSet("dash", null);   // never show a previous user's dashboard
     S.leaves = null; await kvSet("leaves", null);
-    S.assam = null; await kvSet("assam", null);
+    S.assam = null; await kvSet("assam", null); S.adm = null; S.dMode = "mine";
     if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
     show("home"); render(); sync(); fetchDash(); fetchLeaves(); fetchAssam();
   } catch (e) {
@@ -369,7 +374,7 @@ async function sync() {
 /* Clear the phone only when nothing is left waiting */
 async function afterSync() {
   if ((await outAll()).length === 0 && (await kvGet("wipe"))) {
-    await wipeAll(); S.session = null; S.dash = null; S.leaves = null; S.assam = null; S.err = "";
+    await wipeAll(); S.session = null; S.dash = null; S.leaves = null; S.assam = null; S.adm = null; S.err = "";
     $("pill").className = "pill"; show("login");
   }
 }
@@ -516,11 +521,13 @@ function closeCam(keepMark) {
 
 /* ===== DASHBOARD ===== */
 function openDash() {
+  S.dMode = "mine"; $("dAdm").classList.remove("on");
   show("dash"); renderDash();
   if (!S.dash || Date.now() - (S.dash.fetchedAt || 0) > DASH_STALE_MS) fetchDash();
 }
 function refreshDash() {
   if (!navigator.onLine) { alert("Internet connection is needed to refresh."); return; }
+  if (S.dMode === "admin") { fetchAdminDash(true); return; }
   fetchDash(true);
 }
 
@@ -540,6 +547,7 @@ async function fetchDash(fresh) {
 }
 
 function renderDash() {
+  if (S.dMode === "admin") { $("dUpd").textContent = ""; return renderAdmin(); }
   const d = S.dash, body = $("dBody");
   $("dUpd").textContent = d && d.fetchedAt ? "Updated: " + new Date(d.fetchedAt).toLocaleString([], { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "";
   if (!d) {
@@ -562,7 +570,7 @@ function cv(c, w, h) {
 
 /* ---------- SALES dashboard (same as the old app, now full screen) ---------- */
 function renderSales(d) {
-  $("dBody").innerHTML =
+  dBox().innerHTML =
     '<div class="row2"><select id="dRange" onchange="drawSales()"><option value="3">Last 3 months</option><option value="6">Last 6 months</option><option value="12">Last 12 months</option></select>' +
     '<button class="btn" onclick="togglePW()">Party wise ▾</button></div>' +
     '<div id="pwRow" style="display:none;gap:8px;align-items:flex-end;margin:-2px 0 12px;flex-wrap:wrap">' +
@@ -584,11 +592,11 @@ function drawSales() {
   S.dRange = $("dRange").value;
   $("dChartTitle").textContent = "SALES vs TARGET (TN)";
   $("pwMsg").textContent = "";
-  drawBars($("cSales"), S.dash.sales.slice(-Number(S.dRange)));
+  drawBars($("cSales"), curDash().sales.slice(-Number(S.dRange)));
 }
 
 function togglePW() {
-  if (S.dash && S.dash.noParty) { $("pwMsg").style.color = ""; $("pwMsg").textContent = "No party wise data available."; return; }   // Assam sales have no party details
+  if (curDash() && curDash().noParty) { $("pwMsg").style.color = ""; $("pwMsg").textContent = "No party wise data available."; return; }   // Assam sales have no party details
   const row = $("pwRow"), open = row.style.display !== "none";
   row.style.display = open ? "none" : "flex";
   if (open) drawSales();
@@ -601,7 +609,10 @@ async function showPW() {
   if (!navigator.onLine) { msg.textContent = "Internet connection is needed for Party wise."; return; }
   msg.style.color = "#B8AF9B"; msg.textContent = "Loading…";
   try {
-    const r = await api({ action: "partyWise", token: S.session.token, from: from, to: to });
+    const r = await api(S.dMode === "admin"
+      ? { action: "adminParty", token: S.session.token, adminToken: S.adm.tok, target: S.adm.sel, from: from, to: to }
+      : { action: "partyWise", token: S.session.token, from: from, to: to });
+    if (r.adminAuth === false) { S.adm = null; msg.textContent = ""; renderAdmin(); return; }
     if (r.auth === false) { S.needLogin = true; render(); msg.textContent = ""; return; }
     msg.style.color = "";
     if (!r.ok) { msg.textContent = r.message || "Something went wrong."; return; }
@@ -663,7 +674,7 @@ function renderOffice(d) {
   } else {
     weekHtml = '<div class="sub" style="font-size:12px;margin-top:14px">Data for this week is not available yet.</div>';
   }
-  $("dBody").innerHTML =
+  dBox().innerHTML =
     '<div class="grid2">' +
       '<div class="card mini"><div class="dtitle">Weekly Score</div>' + weekHtml + "</div>" +
       '<div class="card mini"><div class="dtitle">Leave Balance</div><canvas id="cLeave"></canvas></div>' +
@@ -681,7 +692,7 @@ function offTab(t) {
   S.dTab = t;
   $("bPend").classList.toggle("on", t === "p");
   $("bDaily").classList.toggle("on", t === "d");
-  $("offList").innerHTML = t === "p" ? pendHtml(S.dash.pending) : dailyHtml(S.dash.daily);
+  $("offList").innerHTML = t === "p" ? pendHtml(curDash().pending) : dailyHtml(curDash().daily);
 }
 
 function pendHtml(p) {
@@ -698,7 +709,7 @@ function dailyHtml(a) {
   return a.map(t =>
     '<div class="card titem"><div class="tcode">' + esc(t.code) + (t.date ? " · " + esc(t.date) : "") + "</div>" +
     '<div class="ttext">' + esc(t.task) + "</div>" +
-    (t.link ? '<a class="btn link' + (wasOpened(t.code) ? " done" : "") + '" href="' + esc(t.link) + '" target="_blank" rel="noopener" data-code="' + esc(t.code) + '" onclick="return fopen(this)">' + (wasOpened(t.code) ? "✓ Form Opened" : "Open Form") + "</a>" : "") +
+    (t.link && S.dMode !== "admin" ? '<a class="btn link' + (wasOpened(t.code) ? " done" : "") + '" href="' + esc(t.link) + '" target="_blank" rel="noopener" data-code="' + esc(t.code) + '" onclick="return fopen(this)">' + (wasOpened(t.code) ? "✓ Form Opened" : "Open Form") + "</a>" : "") +
     "</div>").join("");
 }
 
@@ -902,6 +913,80 @@ async function renderLeaveList() {
       (x.excl === "Yes" ? '<div class="sub" style="font-size:11px">Except Holiday &amp; Week Off</div>' : "") +
       '<div class="lr"><div class="lrt">' + esc(x.reason || "—") + (x.photos ? " · 📎 " + x.photos : "") + '</div><span class="st ' + st.c + '">' + esc(st.l) + "</span></div></div>";
   }).join("");
+}
+
+/* ===== ADMIN (inside Dashboard) ===== */
+const dBox = () => S.dMode === "admin" ? $("admView") : $("dBody");
+const curDash = () => S.dMode === "admin" ? (S.adm && S.adm.data) : S.dash;
+
+function openAdmin() {
+  if (!S.session.profile.isAdmin) return;
+  S.dMode = S.dMode === "admin" ? "mine" : "admin";
+  $("dAdm").classList.toggle("on", S.dMode === "admin");
+  renderDash();
+}
+
+function renderAdmin() {
+  const A = S.adm;
+  if (!A || !A.tok || A.exp < Date.now()) {
+    S.adm = null;
+    $("dBody").innerHTML = '<div class="card"><label for="admPin">Admin password</label><input id="admPin" type="password" placeholder="Enter admin password" autocomplete="off">' +
+      '<button class="btn" id="admBtn" onclick="admUnlock()">Unlock</button><div class="msg" id="admMsg"></div></div>';
+    $("admPin").addEventListener("keydown", e => { if (e.key === "Enter") admUnlock(); });
+    return;
+  }
+  const groups = {};
+  A.users.forEach(u => { (groups[u.g] = groups[u.g] || []).push(u); });
+  $("dBody").innerHTML =
+    '<select id="admSel" onchange="admPick(this.value)" style="width:100%;padding:12px;border-radius:10px;font-size:15px;background:rgba(255,255,255,.06);color:var(--cream);border:1px solid rgba(240,180,41,.3);margin-bottom:14px">' +
+    '<option value="">Select a user…</option>' +
+    Object.keys(groups).map(g => '<optgroup label="' + esc(g) + '">' + groups[g].map(u => '<option value="' + esc(u.u) + '"' + (A.sel === u.u ? " selected" : "") + ">" + esc(u.n) + "</option>").join("") + "</optgroup>").join("") +
+    '</select><div id="admView"></div>';
+  renderAdminView();
+}
+
+function renderAdminView() {
+  const A = S.adm, d = A.data, v = $("admView"), note = t => { v.innerHTML = '<div class="card sub" style="text-align:center">' + t + "</div>"; };
+  if (!A.sel) return note("Select a user to see his dashboard.");
+  if (!d) return note("Loading…");
+  if (d.role === "sales") renderSales(d);
+  else if (d.role === "office") renderOffice(d);
+  else note("No dashboard for this user.");
+}
+
+async function admUnlock() {
+  const pin = $("admPin").value, msg = $("admMsg"), btn = $("admBtn");
+  if (!pin) { msg.textContent = "Please enter the admin password."; return; }
+  if (!navigator.onLine) { msg.textContent = "Internet connection is needed."; return; }
+  btn.disabled = true; msg.textContent = "";
+  try {
+    const r = await api({ action: "adminUnlock", token: S.session.token, pin: pin });
+    if (r.auth === false) { S.needLogin = true; render(); return; }
+    if (!r.ok) { msg.textContent = r.message || "Wrong password."; btn.disabled = false; return; }
+    S.adm = { tok: r.adminToken, exp: Date.now() + 29 * 60000, users: r.users, sel: "", data: null };
+    renderAdmin();
+  } catch (e) { msg.textContent = "Network problem — please try again."; btn.disabled = false; }
+}
+
+function admPick(u) {
+  S.adm.sel = u; S.adm.data = null;
+  renderAdminView();
+  if (u) fetchAdminDash(false);
+}
+
+async function fetchAdminDash(fresh) {
+  const A = S.adm;
+  if (!A || !A.sel) return;
+  const want = A.sel, v = $("admView"), note = t => { if (S.adm === A && A.sel === want && $("admView")) $("admView").innerHTML = '<div class="card sub" style="text-align:center">' + t + "</div>"; };
+  if (!navigator.onLine) return note("Internet connection is needed.");
+  try {
+    const r = await api({ action: "adminDash", token: S.session.token, adminToken: A.tok, target: want, fresh: !!fresh });
+    if (r.auth === false) { S.needLogin = true; render(); return; }
+    if (r.adminAuth === false) { S.adm = null; renderAdmin(); return; }
+    if (S.adm !== A || A.sel !== want) return;   // another user was picked meanwhile
+    if (!r.ok) return note(esc(r.message || "Something went wrong."));
+    A.data = r.data; renderAdminView();
+  } catch (e) { note("Network problem — please try again."); }
 }
 
 /* ===== ASSAM SALE ===== */
