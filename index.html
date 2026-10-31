@@ -105,6 +105,17 @@ input[type=date]{color-scheme:dark}
 .st.pend{background:rgba(240,180,41,.18);color:var(--gold)}
 .st.up{background:rgba(255,255,255,.1);color:var(--mut)}
 
+.dots{color:var(--mut);font-size:22px;line-height:1;padding:6px 10px;cursor:pointer;user-select:none}
+.about-line{margin-bottom:8px;color:#D8CBA5}.about-line b{color:var(--gold)}
+#infoMenu{display:none;position:fixed;z-index:70;background:#1C1913;border:1px solid rgba(240,180,41,.3);border-radius:10px;overflow:hidden;min-width:170px;box-shadow:0 8px 20px rgba(0,0,0,.5)}
+#infoMenu div{padding:13px 14px;font-size:14px;color:var(--cream);cursor:pointer;border-bottom:1px solid rgba(255,255,255,.06)}
+#infoMenu div:last-child{border-bottom:0}
+#infoPanel{display:none;position:fixed;inset:0;z-index:80;background:#14120E;overflow-y:auto;padding:20px max(20px,env(safe-area-inset-right)) 40px}
+#infoPanel .ih{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;max-width:380px;margin-left:auto;margin-right:auto}
+#infoPanel h3{color:var(--gold);margin:0;font-size:17px}
+#infoBody{max-width:380px;margin:0 auto;font-size:14px;line-height:1.7;color:var(--cream)}
+#infoBody h4{color:var(--gold);font-size:14px;margin:16px 0 4px}
+#infoBody ul{padding-left:20px;margin:6px 0}#infoBody li{margin-bottom:6px}
 /* ---- Assam Sale ---- */
 .btn.small{padding:11px;font-size:14px;margin-bottom:10px}
 .btn.dis{opacity:.4;pointer-events:none}
@@ -132,7 +143,7 @@ select option,select optgroup{background:#1C1913;color:var(--cream)}
 
   <div id="pill" class="pill" onclick="pillTap()"></div>
 
-  <div id="login" class="screen card">
+  <div id="login" class="screen card" style="position:relative"><span class="dots" style="position:absolute;top:4px;right:4px" onclick="toggleMenu(event)">⋮</span>
     <label for="u">Username</label>
     <input id="u" placeholder="Enter username" autocapitalize="characters" autocomplete="username">
     <label for="p">Password</label>
@@ -142,6 +153,7 @@ select option,select optgroup{background:#1C1913;color:var(--cream)}
   </div>
 
   <div id="home" class="screen">
+    <div style="display:flex;justify-content:flex-end;margin:-6px 0 2px"><span class="dots" onclick="toggleMenu(event)">⋮</span></div>
     <div class="card tap" style="padding:12px 14px;font-size:13px;color:#D8CBA5" id="sum" onclick="openDash()"></div>
     <h2 id="hi" style="text-align:center;color:var(--gold);margin:20px 0 2px"></h2>
     <div class="sub" style="text-align:center">What would you like to do?</div>
@@ -166,7 +178,7 @@ select option,select optgroup{background:#1C1913;color:var(--cream)}
       <button class="btn ghost" id="dAdm" onclick="openAdmin()">ADMIN</button>
       <button class="btn ghost" id="dRef" onclick="refreshDash()">⟳ Refresh</button>
     </div>
-    <div class="sub" id="dUpd" style="text-align:center;margin:0 0 12px"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin:0 0 12px"><span class="sub" id="dUpd"></span><span class="dots" onclick="openInfo('dashboard',1)">⋮</span></div>
     <div id="dBody"></div>
   </div>
 
@@ -174,6 +186,7 @@ select option,select optgroup{background:#1C1913;color:var(--cream)}
     <div class="dhead">
       <button class="btn ghost" onclick="show('home');render()">← Back</button>
       <button class="btn ghost" id="lvRef" onclick="refreshLeaves()" style="display:none">⟳ Refresh</button>
+      <span class="dots" onclick="openInfo('leave',1)">⋮</span>
     </div>
     <div class="row2" id="lvTabs"></div>
     <div id="lvBody"></div>
@@ -183,13 +196,14 @@ select option,select optgroup{background:#1C1913;color:var(--cream)}
     <div class="dhead">
       <button class="btn ghost" onclick="show('home');render()">← Back</button>
       <button class="btn ghost" id="asRef" onclick="refreshAssam()">⟳ Refresh</button>
+      <span class="dots" onclick="openInfo('assam',1)">⋮</span>
     </div>
     <div class="dtitle" id="asTitle" style="margin-top:4px"></div>
     <div id="asBody"></div>
   </div>
 
   <div id="att" class="screen">
-    <button class="btn ghost" style="width:auto;padding:10px 16px;margin-bottom:18px" onclick="show('home');render()">← Back</button>
+    <div class="dhead" style="margin-bottom:12px"><button class="btn ghost" onclick="show('home');render()">← Back</button><span class="dots" onclick="openInfo('attendance',1)">⋮</span></div>
     <div class="card" style="text-align:center;margin-bottom:18px">
       <div class="sub" id="attStatus"></div>
       <div class="big" id="attTime">--:--</div>
@@ -206,6 +220,9 @@ select option,select optgroup{background:#1C1913;color:var(--cream)}
 
   <div class="small" id="foot" style="margin-top:28px">Jay Baba Group · Internal Use Only</div>
 </div>
+
+<div id="infoMenu"><div onclick="openInfo('howto')">❓ How to Use</div><div onclick="openInfo('benefits')">✨ Benefits</div><div onclick="openInfo('about')">ℹ️ About</div></div>
+<div id="infoPanel"><div class="ih"><h3 id="infoTitle"></h3><span class="dots" onclick="closeInfo()">✕</span></div><div id="infoBody"></div></div>
 
 <div id="camBox" style="display:none;position:fixed;inset:0;z-index:50;background:#000;flex-direction:column;align-items:center;justify-content:center;gap:16px">
   <video id="camVideo" playsinline muted style="width:100%;max-height:70vh;object-fit:contain;transform:scaleX(-1)"></video>
@@ -446,6 +463,7 @@ async function attAction() {
     ts: Date.now(), lat: S.coords.lat, lng: S.coords.lng, photo: S.photo || ""
   };
   await outPut(op);                       // saved on the phone first — works with any net
+  bgSync();
   msg.textContent = "";
   S.photo = null; $("prev").style.display = "none"; $("cam").value = "";
   if (op.type === "logout" && WIPE_ON_ATT_LOGOUT) await kvSet("wipe", true);
@@ -850,6 +868,7 @@ async function submitLeave() {
     photos: L.type === "SL" ? L.photos.slice() : []
   };
   await outPut(op);                       // saved on the phone first — works with any net
+  bgSync();
   localStorage.setItem("lvWa", wa);
   const text = "Leave request: " + L.type + " from " + fmtLv(start) + " to " + fmtLv(end) + ". — " + pf.name;
   S.lv = { type: null, photos: [] };
@@ -962,19 +981,23 @@ function renderOverview() {
   const part = A.tab === "o" ? A.ov.office : A.ov.sales;
   if (!part.rows.length) return note("No data available.");
   box.innerHTML = '<div class="sub" style="font-size:11px;margin:0 0 6px">' + esc(part.label) + '</div><div class="cwrap"><canvas id="cRank"></canvas></div>';
-  drawRank($("cRank"), part.rows);
+  drawRank($("cRank"), part.rows, A.tab === "s");
 }
 
-function drawRank(canvas, rows) {
-  const bw = 40, gap = 20, top = 22, ch = 150, ls = 50;
+function drawRank(canvas, rows, byTon) {
+  const bw = 44, gap = 18, top = 28, ch = 150, ls = 50;
   const w = Math.max(320, rows.length * (bw + gap) + gap), h = top + ch + ls;
   const x = cv(canvas, w, h); x.clearRect(0, 0, w, h);
-  const mx = Math.max.apply(null, rows.map(r => r.pct).concat([100]));
+  const val = r => byTon ? r.done : r.pct;
+  const mx = Math.max.apply(null, rows.map(val).concat([byTon ? 1 : 100]));
+  const f = n => Number.isInteger(n) ? n : Math.round(n * 10) / 10;
   x.textAlign = "center";
   rows.forEach((r, i) => {
-    const px = gap + i * (bw + gap), bh = Math.max(2, r.pct / mx * ch);
+    const px = gap + i * (bw + gap), bh = Math.max(2, val(r) / mx * ch), by = top + ch - bh;
     x.fillStyle = r.pct >= 100 ? "#3FA34D" : "#F0B429";
-    x.fillRect(px, top + ch - bh, bw, bh);
+    x.fillRect(px, by, bw, bh);
+    x.fillStyle = "#FBF6EC"; x.font = "bold 10px Arial";
+    x.fillText(f(r.done) + "/" + f(r.total), px + bw / 2, Math.max(12, by - 6));   // done / total (tasks, or tons / target)
     let nm = String(r.n).split(" ")[0].toLowerCase(); nm = nm.charAt(0).toUpperCase() + nm.slice(1);
     if (nm.length > 8) nm = nm.slice(0, 8) + "…";
     x.fillStyle = "#D8CBA5"; x.font = "11px Arial"; x.fillText(nm, px + bw / 2, top + ch + 16);
@@ -1113,12 +1136,59 @@ async function asSave(i) {
   if (!confirm("Save for " + (e.name || e.id) + " on " + dayNum(e.date) + "?\n\nQty: " + q + " Ton\nAmount: ₹" + a + "\n\nThis cannot be changed after saving.")) return;
   await outPut({ opId: crypto.randomUUID(), type: "assam", entryId: crypto.randomUUID(), ts: Date.now(), uid: e.id, date: e.date, name: e.name, qty: Number(q), amt: Number(a) });
   delete S.asd[e.id + "|" + e.date];
-  render(); sync();
+  bgSync(); render(); sync();
 }
+
+/* Ask the browser to upload waiting entries as soon as the internet is back, even if the app is closed (Android Chrome) */
+function bgSync() {
+  try { if ("serviceWorker" in navigator) navigator.serviceWorker.ready.then(r => { if (r.sync) r.sync.register("swastik-sync"); }).catch(() => { }); } catch (e) { }
+}
+
+/* ===== HELP / ABOUT (⋮ menus) ===== */
+const INFO = {
+  howto: { t: "❓ How to Use", h:
+    "<h4>1. Login</h4><p>Use the username and password given by your admin. You stay logged in, just like WhatsApp, so you do not have to type them again. Tap <b>Sign out</b> only when you want to remove your account from this phone.</p>" +
+    "<h4>2. Works without internet</h4><p>Attendance, Leave and Assam Sale entries are saved on your phone first and upload automatically when the internet is back. On Android this usually happens even if the app is closed. A bar at the top of the home screen shows how many entries are still waiting.</p>" +
+    "<h4>3. Attendance</h4><ul><li>Tap <b>Attendance</b>, then <b>Login</b> to start your day and <b>Logout</b> when you finish.</li><li>Your location is required; a photo too if your account needs one.</li></ul>" +
+    "<h4>4. Leave</h4><ul><li>Tap <b>Leave</b>, choose the type, dates and reason, then submit.</li><li>Open <b>My Requests</b> to see the status: green = Approved, light red = Cancel, dark red = Not Approved.</li></ul>" +
+    "<h4>5. Dashboard</h4><p>Tap the card at the top of the home screen to see your performance: sales vs target and attendance for sales people, weekly score, leave balance and tasks for office staff.</p>" +
+    "<h4>6. Assam Sale</h4><p>Only for people with permission. Fill Quantity (Ton) and Approx Amount against a date. A saved entry cannot be changed.</p>" +
+    "<h4>Install on your phone</h4><p>Open the app link in Chrome, tap the menu and choose <b>Add to Home screen</b> / <b>Install app</b>.</p>" +
+    "<h4>Tip</h4><p>Each screen has its own <b>⋮</b> with help for that screen.</p>" },
+  benefits: { t: "✨ Benefits", h:
+    "<ul><li>No paper registers: attendance with time, location and photo is recorded automatically.</li><li>Works with a weak or no connection; nothing is lost.</li><li>Apply for leave in the app and see the decision on your phone.</li><li>Your dashboard shows your targets and tasks at a glance.</li><li>Management sees the whole team in one place.</li><li>Everything is saved safely in the company Google Sheet.</li></ul>" +
+    "<p style='color:#8A8270;font-size:12px'>More features are added regularly.</p>" },
+  about: { t: "ℹ️ About", h:
+    "<div class='about-line'><b>App:</b> Swastik App</div><div class='about-line'><b>Company:</b> Jay Baba Bakreswar Rice Mill Pvt. Ltd</div><div class='about-line'><b>Version:</b> v2.0</div><div class='about-line'><b>Type:</b> Installable web app (PWA)</div><div class='about-line'><b>Developed by:</b> Ravi Mandal</div>" }
+};
+const TAB_HELP = {
+  attendance: { t: "❓ Attendance", h: "<ul><li>Tap <b>Login</b> to start your day and <b>Logout</b> when you finish.</li><li>Location is captured automatically. Take a photo if your account requires it.</li><li>No internet? Your entry is saved on the phone and uploaded later.</li><li>If you forget to logout, the session is closed automatically the next day.</li></ul>" },
+  leave: { t: "❓ Leave", h: "<ul><li><b>Apply Leave:</b> choose CL, SL, HD1, HD2 or W/O, pick the dates, add a reason and your WhatsApp number.</li><li>For Sick Leave you can attach photos (optional).</li><li><b>My Requests:</b> shows every request with its status — green Approved, light red Cancel, dark red Not Approved, gold Pending.</li><li>A submitted request cannot be edited in the app. Ask your admin for corrections.</li></ul>" },
+  dashboard: { t: "❓ Dashboard", h: "<ul><li><b>Sales:</b> pick 3, 6 or 12 months to compare sales with target. <b>Party wise</b> shows sales by party for a date range (needs internet).</li><li><b>Office:</b> Weekly Score, leave balance, <b>Weekly Pending</b> tasks and today's <b>Daily Task</b> forms.</li><li>The page shows the last saved data when offline. Tap <b>Refresh</b> for the latest.</li><li>The <b>ADMIN</b> tab works only for the admin account.</li></ul>" },
+  assam: { t: "❓ Assam Sale", h: "<ul><li>Dates of the running month are listed from the 1st to the last day. Sundays are shown in red.</li><li>Enter <b>Qty (Ton)</b> and <b>Amount</b> on an empty line and tap ✓. You can fill any team member's line.</li><li>A saved line cannot be changed from the app.</li><li>Offline entries are uploaded automatically later.</li></ul>" }
+};
+
+function toggleMenu(ev) {
+  ev.stopPropagation();
+  const m = $("infoMenu");
+  if (m.style.display === "block") { m.style.display = "none"; return; }
+  const r = ev.currentTarget.getBoundingClientRect();
+  m.style.top = (r.bottom + 4) + "px"; m.style.right = Math.max(8, window.innerWidth - r.right) + "px";
+  m.style.display = "block";
+}
+function openInfo(key, tab) {
+  $("infoMenu").style.display = "none";
+  const c = tab ? TAB_HELP[key] : INFO[key];
+  $("infoTitle").textContent = c.t; $("infoBody").innerHTML = c.h;
+  $("infoPanel").style.display = "block";
+}
+function closeInfo() { $("infoPanel").style.display = "none"; }
+document.addEventListener("click", () => { $("infoMenu").style.display = "none"; });
 
 /* ===== START ===== */
 (async function () {
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
+  kvSet("apiUrl", API_URL);
   const ca = Number(localStorage.getItem("camAt")) || 0;
   if (ca && Date.now() - ca < 180000) {      // the page restarted while the camera was open
     logEvt("PAGE RELOADED right after camera was opened");
@@ -1129,6 +1199,7 @@ async function asSave(i) {
   S.dash = (await kvGet("dash")) || null;
   S.leaves = (await kvGet("leaves")) || null;
   S.assam = (await kvGet("assam")) || null;
+  if ((await outAll()).length) bgSync();
   if (s) { S.session = s; if (await checkGate()) retryGate(); else { show("home"); render(); sync(); if (back === "att") openAtt(); } } else show("login");
   addEventListener("online", () => $("gate").classList.contains("on") ? retryGate() : sync());
   addEventListener("offline", render);
