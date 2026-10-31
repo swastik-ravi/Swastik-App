@@ -527,7 +527,7 @@ function openDash() {
 }
 function refreshDash() {
   if (!navigator.onLine) { alert("Internet connection is needed to refresh."); return; }
-  if (S.dMode === "admin") { fetchAdminDash(true); return; }
+  if (S.dMode === "admin") { fetchAdminOv(true); if (S.adm && S.adm.sel) fetchAdminDash(true); return; }
   fetchDash(true);
 }
 
@@ -928,7 +928,7 @@ function openAdmin() {
 
 function renderAdmin() {
   const A = S.adm;
-  if (!A || !A.tok || A.exp < Date.now()) {
+  if (!A || !A.tok) {
     S.adm = null;
     $("dBody").innerHTML = '<div class="card"><label for="admPin">Admin password</label><input id="admPin" type="password" placeholder="Enter admin password" autocomplete="off">' +
       '<button class="btn" id="admBtn" onclick="admUnlock()">Unlock</button><div class="msg" id="admMsg"></div></div>';
@@ -938,11 +938,62 @@ function renderAdmin() {
   const groups = {};
   A.users.forEach(u => { (groups[u.g] = groups[u.g] || []).push(u); });
   $("dBody").innerHTML =
+    '<div class="row2"><button class="tabbtn' + (A.tab === "o" ? " on" : "") + '" onclick="admTab(\'o\')">Office Staff</button>' +
+    '<button class="tabbtn' + (A.tab === "s" ? " on" : "") + '" onclick="admTab(\'s\')">Sales Man</button></div>' +
+    '<div id="admOv"></div>' +
+    '<div class="dtitle" style="margin-top:22px">INDIVIDUAL DASHBOARD</div>' +
     '<select id="admSel" onchange="admPick(this.value)" style="width:100%;padding:12px;border-radius:10px;font-size:15px;background:rgba(255,255,255,.06);color:var(--cream);border:1px solid rgba(240,180,41,.3);margin-bottom:14px">' +
     '<option value="">Select a user…</option>' +
     Object.keys(groups).map(g => '<optgroup label="' + esc(g) + '">' + groups[g].map(u => '<option value="' + esc(u.u) + '"' + (A.sel === u.u ? " selected" : "") + ">" + esc(u.n) + "</option>").join("") + "</optgroup>").join("") +
     '</select><div id="admView"></div>';
+  renderOverview();
   renderAdminView();
+}
+
+function admTab(t) { S.adm.tab = t; renderAdmin(); }
+
+/* Overall report: one column per person, best first; name under the column, % in bold under the name */
+function renderOverview() {
+  const A = S.adm, box = $("admOv");
+  if (!box) return;
+  const note = t => { box.innerHTML = '<div class="card sub" style="text-align:center">' + t + "</div>"; };
+  if (A.ovErr) return note(esc(A.ovErr));
+  if (!A.ov) return note("Loading…");
+  const part = A.tab === "o" ? A.ov.office : A.ov.sales;
+  if (!part.rows.length) return note("No data available.");
+  box.innerHTML = '<div class="sub" style="font-size:11px;margin:0 0 6px">' + esc(part.label) + '</div><div class="cwrap"><canvas id="cRank"></canvas></div>';
+  drawRank($("cRank"), part.rows);
+}
+
+function drawRank(canvas, rows) {
+  const bw = 40, gap = 20, top = 22, ch = 150, ls = 50;
+  const w = Math.max(320, rows.length * (bw + gap) + gap), h = top + ch + ls;
+  const x = cv(canvas, w, h); x.clearRect(0, 0, w, h);
+  const mx = Math.max.apply(null, rows.map(r => r.pct).concat([100]));
+  x.textAlign = "center";
+  rows.forEach((r, i) => {
+    const px = gap + i * (bw + gap), bh = Math.max(2, r.pct / mx * ch);
+    x.fillStyle = r.pct >= 100 ? "#3FA34D" : "#F0B429";
+    x.fillRect(px, top + ch - bh, bw, bh);
+    let nm = String(r.n).split(" ")[0].toLowerCase(); nm = nm.charAt(0).toUpperCase() + nm.slice(1);
+    if (nm.length > 8) nm = nm.slice(0, 8) + "…";
+    x.fillStyle = "#D8CBA5"; x.font = "11px Arial"; x.fillText(nm, px + bw / 2, top + ch + 16);
+    x.fillStyle = "#FBF6EC"; x.font = "bold 13px Arial"; x.fillText(r.pct + "%", px + bw / 2, top + ch + 34);
+  });
+}
+
+async function fetchAdminOv(fresh) {
+  const A = S.adm;
+  if (!A) return;
+  if (!navigator.onLine) { A.ovErr = "Internet connection is needed."; renderOverview(); return; }
+  try {
+    const r = await api({ action: "adminOverview", token: S.session.token, adminToken: A.tok, fresh: !!fresh });
+    if (r.auth === false) { S.needLogin = true; render(); return; }
+    if (r.adminAuth === false) { S.adm = null; renderAdmin(); return; }
+    if (S.adm !== A) return;
+    if (!r.ok) { A.ovErr = r.message || "Something went wrong."; renderOverview(); return; }
+    A.ov = r; A.ovErr = ""; renderOverview();
+  } catch (e) { if (S.adm === A) { A.ovErr = "Network problem — please try again."; renderOverview(); } }
 }
 
 function renderAdminView() {
@@ -963,8 +1014,8 @@ async function admUnlock() {
     const r = await api({ action: "adminUnlock", token: S.session.token, pin: pin });
     if (r.auth === false) { S.needLogin = true; render(); return; }
     if (!r.ok) { msg.textContent = r.message || "Wrong password."; btn.disabled = false; return; }
-    S.adm = { tok: r.adminToken, exp: Date.now() + 29 * 60000, users: r.users, sel: "", data: null };
-    renderAdmin();
+    S.adm = { tok: r.adminToken, users: r.users, sel: "", data: null, tab: "o", ov: null, ovErr: "" };
+    renderAdmin(); fetchAdminOv(false);
   } catch (e) { msg.textContent = "Network problem — please try again."; btn.disabled = false; }
 }
 
@@ -1081,7 +1132,11 @@ async function asSave(i) {
   if (s) { S.session = s; if (await checkGate()) retryGate(); else { show("home"); render(); sync(); if (back === "att") openAtt(); } } else show("login");
   addEventListener("online", () => $("gate").classList.contains("on") ? retryGate() : sync());
   addEventListener("offline", render);
-  document.addEventListener("visibilitychange", () => { if (!document.hidden) sync(); });
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) { S.adm = null; return; }   // the admin password is asked again every time the app is opened
+    sync();
+    if (S.dMode === "admin" && $("dash").classList.contains("on")) renderDash();
+  });
   setInterval(sync, 60000);
   $("p").addEventListener("keydown", e => { if (e.key === "Enter") doLogin(); });
 })();
