@@ -107,12 +107,16 @@ input[type=date]{color-scheme:dark}
 
 .btn.ic{padding:10px 13px;font-size:16px}
 .btn.mini{width:auto;padding:7px 12px;font-size:12px}
-.fsx{display:none;position:fixed;top:10px;right:12px;z-index:90;width:auto;padding:9px 14px;font-size:13px;background:#1C1913}
-#dWrap:fullscreen{background:#14120E;overflow:auto;padding:14px 16px}
-#dWrap:-webkit-full-screen{background:#14120E;overflow:auto;padding:14px 16px}
-#dWrap.fakefs{position:fixed;inset:0;z-index:60;background:#14120E;overflow:auto;padding:14px 16px}
-#dWrap:fullscreen .fsx,#dWrap.fakefs .fsx{display:block}
-#dWrap:-webkit-full-screen .fsx{display:block}
+.fsx{display:none;width:auto;padding:9px 14px;font-size:13px;background:#1C1913}
+.fsw:fullscreen{background:#14120E;overflow:auto;padding:14px 16px}
+.fsw:-webkit-full-screen{background:#14120E;overflow:auto;padding:14px 16px}
+.fsw.fakefs{position:fixed;inset:0;z-index:60;background:#14120E;overflow:auto;padding:14px 16px}
+.fsw:fullscreen .fsx,.fsw.fakefs .fsx{display:block;position:sticky;top:0;margin:0 0 12px auto;z-index:5}
+.fsw:-webkit-full-screen .fsx{display:block;position:sticky;top:0;margin:0 0 12px auto;z-index:5}
+.tbar{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:0 0 4px}
+.tview{display:flex;justify-content:flex-end;margin:0 0 10px}
+.tctl{display:flex;gap:8px;align-items:center}
+.tctl select{padding:8px;font-size:12px;border-radius:10px;background:rgba(255,255,255,.06);color:var(--cream);border:1px solid rgba(240,180,41,.3)}
 .dots{color:var(--mut);font-size:22px;line-height:1;padding:6px 10px;cursor:pointer;user-select:none}
 .about-line{margin-bottom:8px;color:#D8CBA5}.about-line b{color:var(--gold)}
 #infoMenu{display:none;position:fixed;z-index:70;background:#1C1913;border:1px solid rgba(240,180,41,.3);border-radius:10px;overflow:hidden;min-width:170px;box-shadow:0 8px 20px rgba(0,0,0,.5)}
@@ -183,12 +187,11 @@ select option,select optgroup{background:#1C1913;color:var(--cream)}
   <div id="dash" class="screen">
     <div class="dhead">
       <button class="btn ghost" onclick="show('home');render()">← Back</button>
-      <button class="btn ghost ic" id="dFs" onclick="enterFs()" title="Full screen">⛶</button>
-      <button class="btn ghost ic" id="dDl" onclick="downloadReport('mine')" title="Download image">⬇</button>
       <button class="btn ghost" id="dRef" onclick="refreshDash()">⟳ Refresh</button>
     </div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin:0 0 12px"><span class="sub" id="dUpd"></span><span class="dots" onclick="openInfo('dashboard',1)">⋮</span></div>
-    <div id="dWrap"><button class="btn ghost fsx" onclick="exitFs()">✕ Exit full screen</button><div id="dBody"></div></div>
+    <div id="tbMine" style="display:none"><div class="tbar" style="justify-content:flex-end"><button class="btn ghost mini" onclick="downloadReport('mine')">⬇ Image</button></div><div class="tview"><button class="btn ghost mini" onclick="enterFs('fsMine')">⛶ View</button></div></div>
+    <div id="fsMine" class="fsw"><button class="btn ghost fsx" onclick="exitFs()">✕ Exit full screen</button><div id="dBody"></div></div>
   </div>
 
   <div id="leave" class="screen">
@@ -577,7 +580,7 @@ async function fetchDash(fresh) {
 function renderDash() {
   const d = S.dash, body = $("dBody");
   $("dUpd").textContent = d && d.fetchedAt ? "Updated: " + new Date(d.fetchedAt).toLocaleString([], { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "";
-  $("dDl").style.display = d && d.role === "admin" ? "none" : "";   // the admin dashboard has a download button on each section
+  $("tbMine").style.display = d && (d.role === "sales" || d.role === "office") ? "" : "none";   // the admin dashboard has its own buttons on each section
   if (!d) {
     S.dMode = "mine";
     body.innerHTML = '<div class="card sub" style="text-align:center">' + (navigator.onLine ? "Loading dashboard…" : "The dashboard will appear once you are online.") + "</div>";
@@ -955,20 +958,40 @@ async function renderLeaveList() {
 const dBox = () => S.dMode === "admin" ? $("admView") : $("dBody");
 const curDash = () => S.dMode === "admin" ? (S.adm && S.adm.data) : S.dash;
 
+const curYm = () => new Date().toLocaleDateString("en-CA").slice(0, 7);
+const monthLabel = k => { const m = String(k).match(/^(\d{4})-(\d{2})$/); return m ? new Date(+m[1], +m[2] - 1, 1).toLocaleDateString("en-GB", { month: "long", year: "numeric" }) : k; };
+function monthOptions(sel) {   // from October 2026 up to this month, newest first
+  const cur = curYm(), out = [];
+  let y = 2026, m = 10;
+  for (;;) {
+    const k = y + "-" + String(m).padStart(2, "0");
+    out.push(k);
+    if (k >= cur) break;
+    if (++m > 12) { m = 1; y++; }
+  }
+  return out.reverse().map(k => '<option value="' + k + '"' + (k === sel ? " selected" : "") + ">" + esc(new Date(+k.slice(0, 4), +k.slice(5) - 1, 1).toLocaleDateString("en-GB", { month: "short", year: "numeric" })) + "</option>").join("");
+}
+
 function renderAdminDash(d) {
-  const A = S.adm || (S.adm = { tab: "o", sel: "", data: null });
+  const A = S.adm || (S.adm = { tab: "o", sel: "", data: null, month: curYm(), months: {}, monErr: "" });
   const groups = {};
   (d.users || []).forEach(u => { (groups[u.g] = groups[u.g] || []).push(u); });
   $("dBody").innerHTML =
     '<div class="row2"><button class="tabbtn' + (A.tab === "o" ? " on" : "") + '" onclick="admTab(\'o\')">Office Staff</button>' +
     '<button class="tabbtn' + (A.tab === "s" ? " on" : "") + '" onclick="admTab(\'s\')">Sales Man</button></div>' +
-    '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin:0 0 6px"><span class="sub" id="ovLabel" style="font-size:11px"></span><button class="btn ghost mini" onclick="downloadReport(\'ov\')">⬇ Image</button></div>' +
-    '<div id="admOv"></div>' +
-    '<div style="display:flex;justify-content:space-between;align-items:center;margin:22px 0 8px"><div class="dtitle" style="margin:0">INDIVIDUAL DASHBOARD</div><button class="btn ghost mini" id="admDl" onclick="downloadReport(\'user\')" style="display:none">⬇ Image</button></div>' +
-    '<select id="admSel" onchange="admPick(this.value)" style="width:100%;padding:12px;border-radius:10px;font-size:15px;background:rgba(255,255,255,.06);color:var(--cream);border:1px solid rgba(240,180,41,.3);margin-bottom:14px">' +
+    '<div class="tbar"><span class="sub" id="ovLabel" style="font-size:12px;flex:1;min-width:0"></span><div class="tctl">' +
+      (A.tab === "s" ? '<select id="ovMonth" onchange="ovMonth(this.value)">' + monthOptions(A.month) + "</select>" : "") +
+      '<button class="btn ghost mini" onclick="downloadReport(\'ov\')">⬇ Image</button></div></div>' +
+    '<div class="tview"><button class="btn ghost mini" onclick="enterFs(\'fsOv\')">⛶ View</button></div>' +
+    '<div id="fsOv" class="fsw"><button class="btn ghost fsx" onclick="exitFs()">✕ Exit full screen</button><div id="admOv"></div></div>' +
+    '<div class="dtitle" style="margin:26px 0 8px">INDIVIDUAL DASHBOARD</div>' +
+    '<select id="admSel" onchange="admPick(this.value)" style="width:100%;padding:12px;border-radius:10px;font-size:15px;background:rgba(255,255,255,.06);color:var(--cream);border:1px solid rgba(240,180,41,.3);margin-bottom:12px">' +
     '<option value="">Select a user…</option>' +
     Object.keys(groups).map(g => '<optgroup label="' + esc(g) + '">' + groups[g].map(u => '<option value="' + esc(u.u) + '"' + (A.sel === u.u ? " selected" : "") + ">" + esc(u.n) + "</option>").join("") + "</optgroup>").join("") +
-    '</select><div id="admView"></div>';
+    '</select>' +
+    '<div id="admTools" style="display:none"><div class="tbar" style="justify-content:flex-end"><button class="btn ghost mini" onclick="downloadReport(\'user\')">⬇ Image</button></div>' +
+    '<div class="tview"><button class="btn ghost mini" onclick="enterFs(\'fsUser\')">⛶ View</button></div></div>' +
+    '<div id="fsUser" class="fsw"><button class="btn ghost fsx" onclick="exitFs()">✕ Exit full screen</button><div id="admView"></div></div>';
   renderOverview();
   renderAdminView();
 }
@@ -976,12 +999,45 @@ function renderAdminDash(d) {
 function admTab(t) { S.adm.tab = t; renderAdminDash(S.dash); }
 
 /* Overall report: one column per person, best first. Office Staff: height = % of tasks done. Sales Man: height = tons. */
+function overviewPart() {
+  const A = S.adm;
+  if (A.tab === "o") return S.dash.office;
+  return A.month === curYm() ? S.dash.sales : A.months[A.month] || null;
+}
+
 function renderOverview() {
-  const A = S.adm, box = $("admOv"), part = A.tab === "o" ? S.dash.office : S.dash.sales;
-  $("ovLabel").textContent = part.label || "";
-  if (!part.rows.length) { box.innerHTML = '<div class="card sub" style="text-align:center">No data available.</div>'; return; }
+  const A = S.adm, box = $("admOv"), part = overviewPart();
+  if (!box) return;
+  const note = t => { box.innerHTML = '<div class="card sub" style="text-align:center">' + t + "</div>"; };
+  $("ovLabel").textContent = A.tab === "o" ? ((S.dash.office && S.dash.office.label) || "") : "Ton wise sale";
+  if (!part) {
+    if (A.monErr) return note(esc(A.monErr));
+    note("Loading…"); fetchAdminMonth(A.month); return;
+  }
+  if (!part.rows.length) return note("No data available.");
   box.innerHTML = '<div class="cwrap"><canvas id="cRank"></canvas></div>';
   drawRank($("cRank"), part.rows, A.tab === "s");
+}
+
+function ovMonth(v) {
+  S.adm.month = v; S.adm.monErr = "";
+  renderOverview();
+}
+
+let monBusy = false;
+async function fetchAdminMonth(ym) {
+  const A = S.adm;
+  if (monBusy || !A || ym === curYm() || A.months[ym]) return;
+  if (!navigator.onLine) { A.monErr = "Internet connection is needed for this month."; renderOverview(); return; }
+  monBusy = true;
+  try {
+    const r = await api({ action: "adminSales", token: S.session.token, ym: ym });
+    if (r.auth === false) { S.needLogin = true; render(); }
+    else if (r.ok) { A.months[ym] = r.sales; A.monErr = ""; }
+    else A.monErr = r.message || "Something went wrong.";
+  } catch (e) { A.monErr = "Network problem — please try again."; }
+  monBusy = false;
+  if (S.adm === A && $("admOv")) renderOverview();
 }
 
 function drawRank(canvas, rows, byTon) {
@@ -1007,7 +1063,7 @@ function drawRank(canvas, rows, byTon) {
 
 function renderAdminView() {
   const A = S.adm, d = A.data, v = $("admView"), note = t => { v.innerHTML = '<div class="card sub" style="text-align:center">' + t + "</div>"; };
-  $("admDl").style.display = d && (d.role === "sales" || d.role === "office") ? "" : "none";
+  $("admTools").style.display = d && (d.role === "sales" || d.role === "office") ? "" : "none";
   if (!A.sel) return note("Select a user to see his dashboard.");
   if (!d) return note("Loading…");
   if (d.role === "sales") renderSales(d);
@@ -1036,10 +1092,10 @@ async function fetchAdminDash(fresh) {
 }
 
 /* ===== FULL SCREEN (phones turn to landscape; on a computer it simply fills the screen) ===== */
-const inFs = () => !!(document.fullscreenElement || document.webkitFullscreenElement) || $("dWrap").classList.contains("fakefs");
+const inFs = () => !!(document.fullscreenElement || document.webkitFullscreenElement) || !!document.querySelector(".fsw.fakefs");
 
-async function enterFs() {
-  const w = $("dWrap");
+async function enterFs(id) {
+  const w = $(id);
   try {
     if (w.requestFullscreen) await w.requestFullscreen();
     else if (w.webkitRequestFullscreen) w.webkitRequestFullscreen();
@@ -1049,7 +1105,7 @@ async function enterFs() {
   setTimeout(fsRefresh, 200);
 }
 function exitFs() {
-  $("dWrap").classList.remove("fakefs");
+  document.querySelectorAll(".fsw.fakefs").forEach(e => e.classList.remove("fakefs"));
   try { if (document.fullscreenElement) document.exitFullscreen(); else if (document.webkitFullscreenElement) document.webkitExitFullscreen(); } catch (e) { }
   try { screen.orientation.unlock(); } catch (e) { }
   setTimeout(fsRefresh, 100);
@@ -1057,7 +1113,9 @@ function exitFs() {
 function fsRefresh() {
   if (inFs()) S.fsK = Math.max(1, Math.min(2.5, Math.min((innerWidth - 32) / 380, (innerHeight - 90) / 260)));
   else S.fsK = 1;
-  if ($("dash").classList.contains("on")) renderDash();
+  if (!$("dash").classList.contains("on")) return;
+  if (S.dMode === "admin") { if ($("admOv")) { renderOverview(); renderAdminView(); } }   // redraw only the charts, so the full screen section is not rebuilt
+  else renderDash();
 }
 document.addEventListener("fullscreenchange", () => { if (!document.fullscreenElement) { try { screen.orientation.unlock(); } catch (e) { } } fsRefresh(); });
 document.addEventListener("webkitfullscreenchange", fsRefresh);
@@ -1083,10 +1141,11 @@ function reportFor(kind) {
   const now = new Date().toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
   if (kind === "ov") {
     const o = S.dash && S.dash.role === "admin" ? S.dash : null, tab = (S.adm && S.adm.tab) || "o";
-    const part = o && (tab === "o" ? o.office : o.sales);
+    const part = o && overviewPart();
     if (!part || !part.rows.length) return null;
     const c = mk(); drawRank(c, part.rows, tab === "s");
-    return { title: (tab === "o" ? "Office Staff" : "Sales Man") + " — Overall Report", sub: "Generated " + now, blocks: [{ t: String(part.label || "").toUpperCase(), c: c }] };
+    const cap = tab === "o" ? String(part.label || "") : "Ton wise sale · " + monthLabel(S.adm.month);
+    return { title: (tab === "o" ? "Office Staff" : "Sales Man") + " — Overall Report", sub: "Generated " + now, blocks: [{ t: cap.toUpperCase(), c: c }] };
   }
   const d = kind === "user" ? (S.adm && S.adm.data) : S.dash;
   if (!d) return null;
