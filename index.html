@@ -105,6 +105,14 @@ input[type=date]{color-scheme:dark}
 .st.pend{background:rgba(240,180,41,.18);color:var(--gold)}
 .st.up{background:rgba(255,255,255,.1);color:var(--mut)}
 
+.btn.ic{padding:10px 13px;font-size:16px}
+.btn.mini{width:auto;padding:7px 12px;font-size:12px}
+.fsx{display:none;position:fixed;top:10px;right:12px;z-index:90;width:auto;padding:9px 14px;font-size:13px;background:#1C1913}
+#dWrap:fullscreen{background:#14120E;overflow:auto;padding:14px 16px}
+#dWrap:-webkit-full-screen{background:#14120E;overflow:auto;padding:14px 16px}
+#dWrap.fakefs{position:fixed;inset:0;z-index:60;background:#14120E;overflow:auto;padding:14px 16px}
+#dWrap:fullscreen .fsx,#dWrap.fakefs .fsx{display:block}
+#dWrap:-webkit-full-screen .fsx{display:block}
 .dots{color:var(--mut);font-size:22px;line-height:1;padding:6px 10px;cursor:pointer;user-select:none}
 .about-line{margin-bottom:8px;color:#D8CBA5}.about-line b{color:var(--gold)}
 #infoMenu{display:none;position:fixed;z-index:70;background:#1C1913;border:1px solid rgba(240,180,41,.3);border-radius:10px;overflow:hidden;min-width:170px;box-shadow:0 8px 20px rgba(0,0,0,.5)}
@@ -175,11 +183,12 @@ select option,select optgroup{background:#1C1913;color:var(--cream)}
   <div id="dash" class="screen">
     <div class="dhead">
       <button class="btn ghost" onclick="show('home');render()">← Back</button>
-      <button class="btn ghost" id="dAdm" onclick="openAdmin()">ADMIN</button>
+      <button class="btn ghost ic" id="dFs" onclick="enterFs()" title="Full screen">⛶</button>
+      <button class="btn ghost ic" id="dDl" onclick="downloadReport('mine')" title="Download image">⬇</button>
       <button class="btn ghost" id="dRef" onclick="refreshDash()">⟳ Refresh</button>
     </div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin:0 0 12px"><span class="sub" id="dUpd"></span><span class="dots" onclick="openInfo('dashboard',1)">⋮</span></div>
-    <div id="dBody"></div>
+    <div id="dWrap"><button class="btn ghost fsx" onclick="exitFs()">✕ Exit full screen</button><div id="dBody"></div></div>
   </div>
 
   <div id="leave" class="screen">
@@ -237,7 +246,7 @@ const OFFLINE_DAYS = 15;                        // longest time the app may run 
 const DASH_STALE_MS = 600000;                   // opening the Dashboard re-fetches if the saved copy is older than 10 min
 
 const $ = id => document.getElementById(id);
-const S = { session: null, busy: false, needLogin: false, err: "", coords: null, photo: null, proc: false, dash: null, dashBusy: false, dRange: "3", dTab: "p", leaves: null, lvBusy: false, lvTab: "a", lv: { type: null, photos: [] }, assam: null, asBusy: false, asd: {}, asScroll: false, dMode: "mine", adm: null };
+const S = { session: null, busy: false, needLogin: false, err: "", coords: null, photo: null, proc: false, dash: null, dashBusy: false, dRange: "3", dTab: "p", leaves: null, lvBusy: false, lvTab: "a", lv: { type: null, photos: [] }, assam: null, asBusy: false, asd: {}, asScroll: false, dMode: "mine", adm: null, pw: null, fsK: 1, exp: 0 };
 const dayKey = ts => new Date(ts).toLocaleDateString("en-CA"); // yyyy-mm-dd
 const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
@@ -307,6 +316,8 @@ function sumHtml(st) {
   if (d && d.role === "sales" && d.sales && d.sales.length) {
     const cur = d.sales[d.sales.length - 1], att = d.attendance;
     t = "This month: <b style='color:var(--gold)'>" + cur.percentage + "%</b> of target &nbsp;•&nbsp; Present <b style='color:var(--gold)'>" + att.presentDaysThisMonth + "/" + att.workingDaysSoFar + "</b> days";
+  } else if (d && d.role === "admin") {
+    t = "<b style='color:var(--gold)'>Admin Dashboard</b> &nbsp;•&nbsp; Office &amp; Sales overview";
   } else if (d && d.role === "office") {
     const lv = d.leave && d.leave.balance != null ? "Leaves <b style='color:var(--gold)'>" + d.leave.balance + "</b>" : "";
     const wk = d.week && d.week.found ? "Week <b style='color:var(--gold)'>" + d.week.actual + "/" + d.week.planned + "</b> done" : "";
@@ -323,7 +334,6 @@ async function render() {
   $("tAtt").classList.toggle("off", !pf.attendanceAccess);
   $("tLeave").classList.toggle("off", pf.leaveAccess === false);
   $("bAssam").classList.toggle("dis", !pf.assamAccess);
-  $("dAdm").classList.toggle("dis", !pf.isAdmin);
 
   let t = "", warn = false;
   if (S.needLogin) { t = "🔒 Session ended. Tap here to login again — your saved entries are safe."; warn = true; }
@@ -357,7 +367,7 @@ async function doLogin() {
     await kvSet("wipe", false); await kvSet("lastOnline", Date.now()); S.needLogin = false; S.err = ""; $("p").value = "";
     S.dash = null; await kvSet("dash", null);   // never show a previous user's dashboard
     S.leaves = null; await kvSet("leaves", null);
-    S.assam = null; await kvSet("assam", null); S.adm = null; S.dMode = "mine";
+    S.assam = null; await kvSet("assam", null); S.adm = null; S.pw = null; S.dMode = "mine";
     if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
     show("home"); render(); sync(); fetchDash(); fetchLeaves(); fetchAssam();
   } catch (e) {
@@ -539,14 +549,14 @@ function closeCam(keepMark) {
 
 /* ===== DASHBOARD ===== */
 function openDash() {
-  S.dMode = "mine"; $("dAdm").classList.remove("on");
+  S.pw = null;
   show("dash"); renderDash();
   if (!S.dash || Date.now() - (S.dash.fetchedAt || 0) > DASH_STALE_MS) fetchDash();
 }
 function refreshDash() {
   if (!navigator.onLine) { alert("Internet connection is needed to refresh."); return; }
-  if (S.dMode === "admin") { fetchAdminOv(true); if (S.adm && S.adm.sel) fetchAdminDash(true); return; }
   fetchDash(true);
+  if (S.dMode === "admin" && S.adm && S.adm.sel) fetchAdminDash(true);
 }
 
 async function fetchDash(fresh) {
@@ -565,13 +575,16 @@ async function fetchDash(fresh) {
 }
 
 function renderDash() {
-  if (S.dMode === "admin") { $("dUpd").textContent = ""; return renderAdmin(); }
   const d = S.dash, body = $("dBody");
   $("dUpd").textContent = d && d.fetchedAt ? "Updated: " + new Date(d.fetchedAt).toLocaleString([], { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "";
+  $("dDl").style.display = d && d.role === "admin" ? "none" : "";   // the admin dashboard has a download button on each section
   if (!d) {
+    S.dMode = "mine";
     body.innerHTML = '<div class="card sub" style="text-align:center">' + (navigator.onLine ? "Loading dashboard…" : "The dashboard will appear once you are online.") + "</div>";
     return;
   }
+  S.dMode = d.role === "admin" ? "admin" : "mine";
+  if (d.role === "admin") return renderAdminDash(d);
   if (d.role === "sales") return renderSales(d);
   if (d.role === "office") return renderOffice(d);
   body.innerHTML = '<div class="card sub" style="text-align:center">Dashboard is not available for this account yet.</div>';
@@ -579,10 +592,10 @@ function renderDash() {
 
 /* crisp canvas on phone screens */
 function cv(c, w, h) {
-  const dpr = window.devicePixelRatio || 1;
-  c.width = Math.round(w * dpr); c.height = Math.round(h * dpr);
-  c.style.width = w + "px"; c.style.height = h + "px";
-  const x = c.getContext("2d"); x.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const k = S.fsK || 1, dpr = S.exp || window.devicePixelRatio || 1;
+  c.width = Math.round(w * k * dpr); c.height = Math.round(h * k * dpr);
+  c.style.width = (w * k) + "px"; c.style.height = (h * k) + "px";
+  const x = c.getContext("2d"); x.setTransform(dpr * k, 0, 0, dpr * k, 0, 0);
   return x;
 }
 
@@ -602,12 +615,15 @@ function renderSales(d) {
     '<div class="dtitle">THIS MONTH ATTENDANCE</div>' +
     '<div style="display:flex;justify-content:center"><canvas id="cDonut"></canvas></div>';
   $("dRange").value = S.dRange;
-  drawSales();
+  if (S.pw) {   // Party wise was open: keep showing it (for example after full screen)
+    $("pwRow").style.display = "flex"; $("pwFrom").value = S.pw.from; $("pwTo").value = S.pw.to;
+    $("dChartTitle").textContent = "PARTY WISE SALES (TN)"; drawBars($("cSales"), S.pw.rows);
+  } else drawSales();
   drawDonut($("cDonut"), d.attendance);
 }
 
 function drawSales() {
-  S.dRange = $("dRange").value;
+  S.dRange = $("dRange").value; S.pw = null;
   $("dChartTitle").textContent = "SALES vs TARGET (TN)";
   $("pwMsg").textContent = "";
   drawBars($("cSales"), curDash().sales.slice(-Number(S.dRange)));
@@ -617,7 +633,7 @@ function togglePW() {
   if (curDash() && curDash().noParty) { $("pwMsg").style.color = ""; $("pwMsg").textContent = "No party wise data available."; return; }   // Assam sales have no party details
   const row = $("pwRow"), open = row.style.display !== "none";
   row.style.display = open ? "none" : "flex";
-  if (open) drawSales();
+  if (open) { S.pw = null; drawSales(); }
 }
 
 async function showPW() {
@@ -628,16 +644,17 @@ async function showPW() {
   msg.style.color = "#B8AF9B"; msg.textContent = "Loading…";
   try {
     const r = await api(S.dMode === "admin"
-      ? { action: "adminParty", token: S.session.token, adminToken: S.adm.tok, target: S.adm.sel, from: from, to: to }
+      ? { action: "adminParty", token: S.session.token, target: S.adm.sel, from: from, to: to }
       : { action: "partyWise", token: S.session.token, from: from, to: to });
-    if (r.adminAuth === false) { S.adm = null; msg.textContent = ""; renderAdmin(); return; }
     if (r.auth === false) { S.needLogin = true; render(); msg.textContent = ""; return; }
     msg.style.color = "";
     if (!r.ok) { msg.textContent = r.message || "Something went wrong."; return; }
     if (!r.parties.length) { msg.textContent = r.note || "No party sales found for this period."; return; }
     msg.textContent = "";
     $("dChartTitle").textContent = "PARTY WISE SALES (TN)";
-    drawBars($("cSales"), r.parties.map(p => ({ month: p.name.length > 10 ? p.name.slice(0, 10) + "…" : p.name, achieved: p.achieved, target: p.target, percentage: p.percentage })));
+    const rows = r.parties.map(p => ({ month: p.name.length > 10 ? p.name.slice(0, 10) + "…" : p.name, achieved: p.achieved, target: p.target, percentage: p.percentage }));
+    S.pw = { rows: rows, from: from, to: to, title: "PARTY WISE SALES (TN) · " + dayNum(from) + " – " + dayNum(to) };
+    drawBars($("cSales"), rows);
   } catch (e) { msg.style.color = ""; msg.textContent = "Network problem — please try again."; }
 }
 
@@ -934,33 +951,20 @@ async function renderLeaveList() {
   }).join("");
 }
 
-/* ===== ADMIN (inside Dashboard) ===== */
+/* ===== ADMIN DASHBOARD (shown directly to the admin account) ===== */
 const dBox = () => S.dMode === "admin" ? $("admView") : $("dBody");
 const curDash = () => S.dMode === "admin" ? (S.adm && S.adm.data) : S.dash;
 
-function openAdmin() {
-  if (!S.session.profile.isAdmin) return;
-  S.dMode = S.dMode === "admin" ? "mine" : "admin";
-  $("dAdm").classList.toggle("on", S.dMode === "admin");
-  renderDash();
-}
-
-function renderAdmin() {
-  const A = S.adm;
-  if (!A || !A.tok) {
-    S.adm = null;
-    $("dBody").innerHTML = '<div class="card"><label for="admPin">Admin password</label><input id="admPin" type="password" placeholder="Enter admin password" autocomplete="off">' +
-      '<button class="btn" id="admBtn" onclick="admUnlock()">Unlock</button><div class="msg" id="admMsg"></div></div>';
-    $("admPin").addEventListener("keydown", e => { if (e.key === "Enter") admUnlock(); });
-    return;
-  }
+function renderAdminDash(d) {
+  const A = S.adm || (S.adm = { tab: "o", sel: "", data: null });
   const groups = {};
-  A.users.forEach(u => { (groups[u.g] = groups[u.g] || []).push(u); });
+  (d.users || []).forEach(u => { (groups[u.g] = groups[u.g] || []).push(u); });
   $("dBody").innerHTML =
     '<div class="row2"><button class="tabbtn' + (A.tab === "o" ? " on" : "") + '" onclick="admTab(\'o\')">Office Staff</button>' +
     '<button class="tabbtn' + (A.tab === "s" ? " on" : "") + '" onclick="admTab(\'s\')">Sales Man</button></div>' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin:0 0 6px"><span class="sub" id="ovLabel" style="font-size:11px"></span><button class="btn ghost mini" onclick="downloadReport(\'ov\')">⬇ Image</button></div>' +
     '<div id="admOv"></div>' +
-    '<div class="dtitle" style="margin-top:22px">INDIVIDUAL DASHBOARD</div>' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin:22px 0 8px"><div class="dtitle" style="margin:0">INDIVIDUAL DASHBOARD</div><button class="btn ghost mini" id="admDl" onclick="downloadReport(\'user\')" style="display:none">⬇ Image</button></div>' +
     '<select id="admSel" onchange="admPick(this.value)" style="width:100%;padding:12px;border-radius:10px;font-size:15px;background:rgba(255,255,255,.06);color:var(--cream);border:1px solid rgba(240,180,41,.3);margin-bottom:14px">' +
     '<option value="">Select a user…</option>' +
     Object.keys(groups).map(g => '<optgroup label="' + esc(g) + '">' + groups[g].map(u => '<option value="' + esc(u.u) + '"' + (A.sel === u.u ? " selected" : "") + ">" + esc(u.n) + "</option>").join("") + "</optgroup>").join("") +
@@ -969,18 +973,14 @@ function renderAdmin() {
   renderAdminView();
 }
 
-function admTab(t) { S.adm.tab = t; renderAdmin(); }
+function admTab(t) { S.adm.tab = t; renderAdminDash(S.dash); }
 
-/* Overall report: one column per person, best first; name under the column, % in bold under the name */
+/* Overall report: one column per person, best first. Office Staff: height = % of tasks done. Sales Man: height = tons. */
 function renderOverview() {
-  const A = S.adm, box = $("admOv");
-  if (!box) return;
-  const note = t => { box.innerHTML = '<div class="card sub" style="text-align:center">' + t + "</div>"; };
-  if (A.ovErr) return note(esc(A.ovErr));
-  if (!A.ov) return note("Loading…");
-  const part = A.tab === "o" ? A.ov.office : A.ov.sales;
-  if (!part.rows.length) return note("No data available.");
-  box.innerHTML = '<div class="sub" style="font-size:11px;margin:0 0 6px">' + esc(part.label) + '</div><div class="cwrap"><canvas id="cRank"></canvas></div>';
+  const A = S.adm, box = $("admOv"), part = A.tab === "o" ? S.dash.office : S.dash.sales;
+  $("ovLabel").textContent = part.label || "";
+  if (!part.rows.length) { box.innerHTML = '<div class="card sub" style="text-align:center">No data available.</div>'; return; }
+  box.innerHTML = '<div class="cwrap"><canvas id="cRank"></canvas></div>';
   drawRank($("cRank"), part.rows, A.tab === "s");
 }
 
@@ -1005,22 +1005,9 @@ function drawRank(canvas, rows, byTon) {
   });
 }
 
-async function fetchAdminOv(fresh) {
-  const A = S.adm;
-  if (!A) return;
-  if (!navigator.onLine) { A.ovErr = "Internet connection is needed."; renderOverview(); return; }
-  try {
-    const r = await api({ action: "adminOverview", token: S.session.token, adminToken: A.tok, fresh: !!fresh });
-    if (r.auth === false) { S.needLogin = true; render(); return; }
-    if (r.adminAuth === false) { S.adm = null; renderAdmin(); return; }
-    if (S.adm !== A) return;
-    if (!r.ok) { A.ovErr = r.message || "Something went wrong."; renderOverview(); return; }
-    A.ov = r; A.ovErr = ""; renderOverview();
-  } catch (e) { if (S.adm === A) { A.ovErr = "Network problem — please try again."; renderOverview(); } }
-}
-
 function renderAdminView() {
   const A = S.adm, d = A.data, v = $("admView"), note = t => { v.innerHTML = '<div class="card sub" style="text-align:center">' + t + "</div>"; };
+  $("admDl").style.display = d && (d.role === "sales" || d.role === "office") ? "" : "none";
   if (!A.sel) return note("Select a user to see his dashboard.");
   if (!d) return note("Loading…");
   if (d.role === "sales") renderSales(d);
@@ -1028,22 +1015,8 @@ function renderAdminView() {
   else note("No dashboard for this user.");
 }
 
-async function admUnlock() {
-  const pin = $("admPin").value, msg = $("admMsg"), btn = $("admBtn");
-  if (!pin) { msg.textContent = "Please enter the admin password."; return; }
-  if (!navigator.onLine) { msg.textContent = "Internet connection is needed."; return; }
-  btn.disabled = true; msg.textContent = "";
-  try {
-    const r = await api({ action: "adminUnlock", token: S.session.token, pin: pin });
-    if (r.auth === false) { S.needLogin = true; render(); return; }
-    if (!r.ok) { msg.textContent = r.message || "Wrong password."; btn.disabled = false; return; }
-    S.adm = { tok: r.adminToken, users: r.users, sel: "", data: null, tab: "o", ov: null, ovErr: "" };
-    renderAdmin(); fetchAdminOv(false);
-  } catch (e) { msg.textContent = "Network problem — please try again."; btn.disabled = false; }
-}
-
 function admPick(u) {
-  S.adm.sel = u; S.adm.data = null;
+  S.adm.sel = u; S.adm.data = null; S.pw = null;
   renderAdminView();
   if (u) fetchAdminDash(false);
 }
@@ -1051,16 +1024,121 @@ function admPick(u) {
 async function fetchAdminDash(fresh) {
   const A = S.adm;
   if (!A || !A.sel) return;
-  const want = A.sel, v = $("admView"), note = t => { if (S.adm === A && A.sel === want && $("admView")) $("admView").innerHTML = '<div class="card sub" style="text-align:center">' + t + "</div>"; };
+  const want = A.sel, note = t => { if (S.adm === A && A.sel === want && $("admView")) $("admView").innerHTML = '<div class="card sub" style="text-align:center">' + t + "</div>"; };
   if (!navigator.onLine) return note("Internet connection is needed.");
   try {
-    const r = await api({ action: "adminDash", token: S.session.token, adminToken: A.tok, target: want, fresh: !!fresh });
+    const r = await api({ action: "adminDash", token: S.session.token, target: want, fresh: !!fresh });
     if (r.auth === false) { S.needLogin = true; render(); return; }
-    if (r.adminAuth === false) { S.adm = null; renderAdmin(); return; }
     if (S.adm !== A || A.sel !== want) return;   // another user was picked meanwhile
     if (!r.ok) return note(esc(r.message || "Something went wrong."));
     A.data = r.data; renderAdminView();
   } catch (e) { note("Network problem — please try again."); }
+}
+
+/* ===== FULL SCREEN (phones turn to landscape; on a computer it simply fills the screen) ===== */
+const inFs = () => !!(document.fullscreenElement || document.webkitFullscreenElement) || $("dWrap").classList.contains("fakefs");
+
+async function enterFs() {
+  const w = $("dWrap");
+  try {
+    if (w.requestFullscreen) await w.requestFullscreen();
+    else if (w.webkitRequestFullscreen) w.webkitRequestFullscreen();
+    else throw new Error("no fullscreen");
+  } catch (e) { w.classList.add("fakefs"); }   // phones that cannot do real full screen get a full-page view
+  try { if (matchMedia("(pointer:coarse)").matches && screen.orientation && screen.orientation.lock) await screen.orientation.lock("landscape"); } catch (e) { }
+  setTimeout(fsRefresh, 200);
+}
+function exitFs() {
+  $("dWrap").classList.remove("fakefs");
+  try { if (document.fullscreenElement) document.exitFullscreen(); else if (document.webkitFullscreenElement) document.webkitExitFullscreen(); } catch (e) { }
+  try { screen.orientation.unlock(); } catch (e) { }
+  setTimeout(fsRefresh, 100);
+}
+function fsRefresh() {
+  if (inFs()) S.fsK = Math.max(1, Math.min(2.5, Math.min((innerWidth - 32) / 380, (innerHeight - 90) / 260)));
+  else S.fsK = 1;
+  if ($("dash").classList.contains("on")) renderDash();
+}
+document.addEventListener("fullscreenchange", () => { if (!document.fullscreenElement) { try { screen.orientation.unlock(); } catch (e) { } } fsRefresh(); });
+document.addEventListener("webkitfullscreenchange", fsRefresh);
+addEventListener("resize", () => { if (inFs()) fsRefresh(); });
+
+/* ===== DOWNLOAD REPORT AS ONE IMAGE (whatever is selected on the screen) ===== */
+function drawWeekExport(c, w) {
+  const W = 260, H = 210, x = cv(c, W, H); x.clearRect(0, 0, W, H); x.textAlign = "center";
+  if (!w.found) { x.fillStyle = "#B8AF9B"; x.font = "13px Arial"; x.fillText("Data for this week is not available.", W / 2, H / 2); return; }
+  const mx = Math.max(w.planned, w.actual, 1), bw = 50, base = 160, ch = 110;
+  [[w.planned, "#F0B429", "Total task", W / 2 - 55], [w.actual, "#3FA34D", "Achieved", W / 2 + 55]].forEach(a => {
+    const bh = Math.max(2, a[0] / mx * ch);
+    x.fillStyle = a[1]; x.fillRect(a[3] - bw / 2, base - bh, bw, bh);
+    x.fillStyle = "#FBF6EC"; x.font = "bold 16px Arial"; x.fillText(String(a[0]), a[3], base + 22);
+    x.fillStyle = "#B8AF9B"; x.font = "11px Arial"; x.fillText(a[2], a[3], base + 38);
+  });
+  x.fillStyle = "#F4A0A0"; x.font = "bold 12px Arial";
+  x.fillText(w.pendingPct > 0 ? w.pendingPct + "% pending" : "✓ done", W / 2 + 55, base - Math.max(2, w.actual / mx * ch) - 8);
+}
+
+function reportFor(kind) {
+  const mk = () => document.createElement("canvas");
+  const now = new Date().toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  if (kind === "ov") {
+    const o = S.dash && S.dash.role === "admin" ? S.dash : null, tab = (S.adm && S.adm.tab) || "o";
+    const part = o && (tab === "o" ? o.office : o.sales);
+    if (!part || !part.rows.length) return null;
+    const c = mk(); drawRank(c, part.rows, tab === "s");
+    return { title: (tab === "o" ? "Office Staff" : "Sales Man") + " — Overall Report", sub: "Generated " + now, blocks: [{ t: String(part.label || "").toUpperCase(), c: c }] };
+  }
+  const d = kind === "user" ? (S.adm && S.adm.data) : S.dash;
+  if (!d) return null;
+  if (d.role === "sales") {
+    const b = [], c1 = mk(), c2 = mk();
+    if (S.pw) { drawBars(c1, S.pw.rows); b.push({ t: S.pw.title, c: c1 }); }
+    else { const n = Number(S.dRange); drawBars(c1, d.sales.slice(-n)); b.push({ t: "SALES vs TARGET (TN) · LAST " + n + " MONTHS", c: c1 }); }
+    drawDonut(c2, d.attendance); b.push({ t: "THIS MONTH ATTENDANCE · LEAVE BALANCE", c: c2 });
+    return { title: d.name + " — Sales Report", sub: "Generated " + now, blocks: b };
+  }
+  if (d.role === "office") {
+    const c1 = mk(), c2 = mk();
+    drawWeekExport(c1, d.week); drawLeave(c2, d.leave.balance, d.leave.max);
+    return { title: d.name + " — Office Report", sub: "Generated " + now, blocks: [{ t: "WEEKLY SCORE" + (d.week.label ? " · " + d.week.label.toUpperCase() : ""), c: c1 }, { t: "LEAVE BALANCE", c: c2 }] };
+  }
+  return null;
+}
+
+function composeReport(rep) {
+  const pad = 20, hd = 86;
+  let w = 360, h = pad + hd + pad;
+  rep.blocks.forEach(b => { w = Math.max(w, b.c.width / 2 + 2 * pad); h += 22 + b.c.height / 2 + 16; });
+  const c = document.createElement("canvas"); c.width = w * 2; c.height = h * 2;
+  const x = c.getContext("2d"); x.scale(2, 2);
+  x.fillStyle = "#14120E"; x.fillRect(0, 0, w, h);
+  x.textAlign = "left";
+  x.fillStyle = "#F0B429"; x.font = "bold 20px Georgia, serif"; x.fillText("SWASTIK RICE", pad, pad + 16);
+  x.fillStyle = "#9A9280"; x.font = "11px Arial"; x.fillText("Jay Baba Bakreswar Rice Mill Pvt. Ltd", pad, pad + 32);
+  x.fillStyle = "#FBF6EC"; x.font = "bold 14px Arial"; x.fillText(rep.title, pad, pad + 54, w - 2 * pad);
+  x.fillStyle = "#B8AF9B"; x.font = "11px Arial"; x.fillText(rep.sub, pad, pad + 70);
+  let y = pad + hd;
+  rep.blocks.forEach(b => {
+    x.fillStyle = "#F0B429"; x.font = "bold 12px Arial"; x.fillText(b.t, pad, y + 12, w - 2 * pad); y += 22;
+    x.drawImage(b.c, pad, y, b.c.width / 2, b.c.height / 2); y += b.c.height / 2 + 16;
+  });
+  return c;
+}
+
+function downloadReport(kind) {
+  const pk = S.fsK, pe = S.exp;
+  S.fsK = 1; S.exp = 2;   // draw at normal size, double sharpness
+  let canvas = null, rep = null;
+  try { rep = reportFor(kind); if (rep) canvas = composeReport(rep); } catch (e) { logEvt("report: " + e.message); }
+  S.fsK = pk; S.exp = pe;
+  if (!canvas) { alert("There is no report to download yet."); return; }
+  const file = "Swastik_" + rep.title.replace(/[^A-Za-z0-9]+/g, "_") + "_" + new Date().toLocaleDateString("en-CA") + ".png";
+  canvas.toBlob(b => {
+    if (!b) { alert("Could not create the image."); return; }
+    const url = URL.createObjectURL(b), a = document.createElement("a");
+    a.href = url; a.download = file; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  }, "image/png");
 }
 
 /* ===== ASSAM SALE ===== */
@@ -1164,7 +1242,7 @@ const INFO = {
 const TAB_HELP = {
   attendance: { t: "❓ Attendance", h: "<ul><li>Tap <b>Login</b> to start your day and <b>Logout</b> when you finish.</li><li>Location is captured automatically. Take a photo if your account requires it.</li><li>No internet? Your entry is saved on the phone and uploaded later.</li><li>If you forget to logout, the session is closed automatically the next day.</li></ul>" },
   leave: { t: "❓ Leave", h: "<ul><li><b>Apply Leave:</b> choose CL, SL, HD1, HD2 or W/O, pick the dates, add a reason and your WhatsApp number.</li><li>For Sick Leave you can attach photos (optional).</li><li><b>My Requests:</b> shows every request with its status — green Approved, light red Cancel, dark red Not Approved, gold Pending.</li><li>A submitted request cannot be edited in the app. Ask your admin for corrections.</li></ul>" },
-  dashboard: { t: "❓ Dashboard", h: "<ul><li><b>Sales:</b> pick 3, 6 or 12 months to compare sales with target. <b>Party wise</b> shows sales by party for a date range (needs internet).</li><li><b>Office:</b> Weekly Score, leave balance, <b>Weekly Pending</b> tasks and today's <b>Daily Task</b> forms.</li><li>The page shows the last saved data when offline. Tap <b>Refresh</b> for the latest.</li><li>The <b>ADMIN</b> tab works only for the admin account.</li></ul>" },
+  dashboard: { t: "❓ Dashboard", h: "<ul><li><b>Sales:</b> pick 3, 6 or 12 months to compare sales with target. <b>Party wise</b> shows sales by party for a date range (needs internet).</li><li><b>Office:</b> Weekly Score, leave balance, <b>Weekly Pending</b> tasks and today's <b>Daily Task</b> forms.</li><li>The page shows the last saved data when offline. Tap <b>Refresh</b> for the latest.</li><li>Tap <b>⛶</b> for full screen (it turns the phone view to landscape) and <b>⬇</b> to download the report as an image.</li><li>Admin accounts see the Office Staff / Sales Man overall reports and can open any user's dashboard.</li></ul>" },
   assam: { t: "❓ Assam Sale", h: "<ul><li>Dates of the running month are listed from the 1st to the last day. Sundays are shown in red.</li><li>Enter <b>Qty (Ton)</b> and <b>Amount</b> on an empty line and tap ✓. You can fill any team member's line.</li><li>A saved line cannot be changed from the app.</li><li>Offline entries are uploaded automatically later.</li></ul>" }
 };
 
@@ -1204,9 +1282,7 @@ document.addEventListener("click", () => { $("infoMenu").style.display = "none";
   addEventListener("online", () => $("gate").classList.contains("on") ? retryGate() : sync());
   addEventListener("offline", render);
   document.addEventListener("visibilitychange", () => {
-    if (document.hidden) { S.adm = null; return; }   // the admin password is asked again every time the app is opened
-    sync();
-    if (S.dMode === "admin" && $("dash").classList.contains("on")) renderDash();
+    if (!document.hidden) sync();
   });
   setInterval(sync, 60000);
   $("p").addEventListener("keydown", e => { if (e.key === "Enter") doLogin(); });
