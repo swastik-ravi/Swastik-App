@@ -113,6 +113,9 @@ input[type=date]{color-scheme:dark}
 .fsw.fakefs{position:fixed;inset:0;z-index:60;background:#14120E;overflow:auto;padding:14px 16px}
 .fsw:fullscreen .fsx,.fsw.fakefs .fsx{display:block;position:sticky;top:0;margin:0 0 12px auto;z-index:5}
 .fsw:-webkit-full-screen .fsx{display:block;position:sticky;top:0;margin:0 0 12px auto;z-index:5}
+.aat{margin-top:6px;font-size:13px;color:#D8CBA5}
+.aal{display:flex;gap:16px;flex-wrap:wrap;margin-top:8px;font-size:13px}
+.aal a{color:var(--gold);text-decoration:none}
 .tbar{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:0 0 4px}
 .tview{display:flex;justify-content:flex-end;margin:0 0 10px}
 .tctl{display:flex;gap:8px;align-items:center}
@@ -214,6 +217,28 @@ select option,select optgroup{background:#1C1913;color:var(--cream)}
     <div id="asBody"></div>
   </div>
 
+  <div id="aatt" class="screen">
+    <div class="dhead"><button class="btn ghost" onclick="show('home');render()">← Back</button><span class="dots" onclick="openInfo('aatt',1)">⋮</span></div>
+    <div class="dtitle" style="margin-top:0">ATTENDANCE · ALL USERS</div>
+    <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:10px">
+      <div style="flex:1;min-width:120px"><label>From</label><input type="date" id="aaFrom" style="margin:0"></div>
+      <div style="flex:1;min-width:120px"><label>To</label><input type="date" id="aaTo" style="margin:0"></div>
+      <button class="btn" style="width:auto;padding:13px 18px;font-size:14px" onclick="loadAdminAtt()">Show</button>
+    </div>
+    <div class="sub" id="aaSum" style="margin:0 0 10px"></div>
+    <div id="aaBody"></div>
+  </div>
+
+  <div id="aleave" class="screen">
+    <div class="dhead"><button class="btn ghost" onclick="show('home');render()">← Back</button><button class="btn ghost" onclick="loadAdminLeave()">⟳ Refresh</button><span class="dots" onclick="openInfo('aleave',1)">⋮</span></div>
+    <div class="dtitle" style="margin-top:0">LEAVE REQUESTS · ALL USERS</div>
+    <select id="alFilter" onchange="renderAdminLeave()" style="width:100%;padding:12px;border-radius:10px;font-size:15px;background:rgba(255,255,255,.06);color:var(--cream);border:1px solid rgba(240,180,41,.3);margin-bottom:10px">
+      <option value="">All status</option><option value="pend">Pending</option><option value="yes">Approved</option><option value="no">Not Approved</option><option value="can">Cancel</option>
+    </select>
+    <div class="sub" id="alSum" style="margin:0 0 10px"></div>
+    <div id="alBody"></div>
+  </div>
+
   <div id="att" class="screen">
     <div class="dhead" style="margin-bottom:12px"><button class="btn ghost" onclick="show('home');render()">← Back</button><span class="dots" onclick="openInfo('attendance',1)">⋮</span></div>
     <div class="card" style="text-align:center;margin-bottom:18px">
@@ -293,7 +318,7 @@ const wipeAll = () => dbp.then(db => new Promise(res => {
 /* ===== SCREEN HELPERS ===== */
 function show(id) {
   document.querySelectorAll(".screen").forEach(e => e.classList.toggle("on", e.id === id));
-  $("appBox").classList.toggle("top", id === "dash" || id === "leave" || id === "assam");
+  $("appBox").classList.toggle("top", id === "dash" || id === "leave" || id === "assam" || id === "aatt" || id === "aleave");
   if (id === "home" || id === "att") localStorage.setItem("scr", id);
 }
 
@@ -334,8 +359,8 @@ async function render() {
   const st = await derive(), pf = S.session.profile;
   $("hi").textContent = "Welcome, " + pf.name.split(" ")[0] + "!";
   $("sum").innerHTML = sumHtml(st);
-  $("tAtt").classList.toggle("off", !pf.attendanceAccess);
-  $("tLeave").classList.toggle("off", pf.leaveAccess === false);
+  $("tAtt").classList.toggle("off", !(pf.attendanceAccess || pf.isAdmin));
+  $("tLeave").classList.toggle("off", pf.leaveAccess === false && !pf.isAdmin);
   $("bAssam").classList.toggle("dis", !pf.assamAccess);
 
   let t = "", warn = false;
@@ -420,6 +445,7 @@ async function signOut() {
 
 /* ===== ATTENDANCE ===== */
 function openAtt() {
+  if (S.session.profile.isAdmin) return openAdminAtt();
   S.photo = null; $("prev").style.display = "none"; $("cam").value = ""; $("attMsg").textContent = "";
   $("camLbl").textContent = S.session.profile.photoRequired ? "📷 Take photo (required)" : "📷 Take photo (optional)";
   show("att"); render(); fetchLoc();
@@ -806,6 +832,7 @@ const fmtLv = s => {
 };
 
 function openLeave() {
+  if (S.session.profile.isAdmin) return openAdminLeave();
   S.lv = { type: null, photos: [] }; S.lvTab = "a";
   show("leave"); renderLeave(); fetchLeaves();
 }
@@ -1200,6 +1227,78 @@ function downloadReport(kind) {
   }, "image/png");
 }
 
+/* ===== ADMIN: ALL USERS' ATTENDANCE AND LEAVE ===== */
+const todayStr = () => new Date().toLocaleDateString("en-CA");
+const infoCard = t => '<div class="card sub" style="text-align:center">' + t + "</div>";
+const aLink = (u, t) => '<a href="' + esc(u) + '" target="_blank" rel="noopener">' + t + "</a>";
+
+function openAdminAtt() {
+  show("aatt");
+  $("aaFrom").value = todayStr(); $("aaTo").value = todayStr();   // always starts with today
+  loadAdminAtt();
+}
+
+async function loadAdminAtt() {
+  const from = $("aaFrom").value, to = $("aaTo").value, body = $("aaBody"), sum = $("aaSum");
+  if (!from || !to) { sum.textContent = "Please pick both dates."; return; }
+  if (from > to) { sum.textContent = "From date must be on or before To date."; return; }
+  if (!navigator.onLine) { sum.textContent = ""; body.innerHTML = infoCard("Internet connection is needed."); return; }
+  sum.textContent = ""; body.innerHTML = infoCard("Loading…");
+  try {
+    const r = await api({ action: "adminAttendance", token: S.session.token, from: from, to: to });
+    if (r.auth === false) { S.needLogin = true; render(); return; }
+    if (!r.ok) { body.innerHTML = infoCard(esc(r.message || "Something went wrong.")); return; }
+    renderAdminAtt(r, from, to);
+  } catch (e) { body.innerHTML = infoCard("Network problem — please try again."); }
+}
+
+function renderAdminAtt(r, from, to) {
+  const body = $("aaBody"), people = new Set(r.rows.map(x => x.u)).size;
+  $("aaSum").textContent = r.total + " entr" + (r.total === 1 ? "y" : "ies") + " · " + people + " " + (people === 1 ? "person" : "people") + (r.total > r.rows.length ? " (showing the latest " + r.rows.length + ")" : "");
+  if (!r.rows.length) { body.innerHTML = infoCard(from === to && from === todayStr() ? "No attendance marked today yet." : "No attendance found for this period."); return; }
+  let html = "", cur = "";
+  r.rows.forEach(x => {
+    if (x.date !== cur) { cur = x.date; html += '<div class="dtitle" style="margin:14px 0 6px">' + esc(dayNum(x.date)) + " · " + esc(dayName(x.date)) + "</div>"; }
+    const out = x.outT ? esc(x.outT) : '<span style="color:#8FDB9C">still logged in</span>';
+    const links = [x.inLoc ? aLink(x.inLoc, "📍 In") : "", x.outLoc ? aLink(x.outLoc, "📍 Out") : "", x.inPh ? aLink(x.inPh, "📷 In") : "", x.outPh ? aLink(x.outPh, "📷 Out") : ""].join("");
+    html += '<div class="lit"><div class="lh"><b>' + esc(x.n) + "</b><span>" + esc(x.u) + "</span></div>" +
+      '<div class="aat">In <b>' + esc(x.inT || "—") + "</b> → Out <b>" + out + "</b>" + (x.hrs ? " · " + esc(x.hrs) : "") + "</div>" +
+      (links ? '<div class="aal">' + links + "</div>" : "") +
+      (x.note ? '<div class="sub" style="font-size:11px;margin-top:6px">' + esc(x.note) + "</div>" : "") + "</div>";
+  });
+  body.innerHTML = html;
+}
+
+let aLeaveRows = null;
+function openAdminLeave() {
+  show("aleave"); $("alFilter").value = "";
+  aLeaveRows = null; $("alBody").innerHTML = infoCard("Loading…"); $("alSum").textContent = "";
+  loadAdminLeave();
+}
+
+async function loadAdminLeave() {
+  if (!navigator.onLine) { $("alBody").innerHTML = infoCard("Internet connection is needed."); return; }
+  try {
+    const r = await api({ action: "adminLeave", token: S.session.token });
+    if (r.auth === false) { S.needLogin = true; render(); return; }
+    if (!r.ok) { $("alBody").innerHTML = infoCard(esc(r.message || "Something went wrong.")); return; }
+    aLeaveRows = r.rows; renderAdminLeave();
+  } catch (e) { $("alBody").innerHTML = infoCard("Network problem — please try again."); }
+}
+
+function renderAdminLeave() {
+  if (!aLeaveRows) return;
+  const f = $("alFilter").value, rows = aLeaveRows.filter(x => !f || statusInfo(x.status).c === f);
+  $("alSum").textContent = rows.length + " request" + (rows.length === 1 ? "" : "s");
+  if (!rows.length) { $("alBody").innerHTML = infoCard("No leave requests found."); return; }
+  $("alBody").innerHTML = rows.map(x => {
+    const st = statusInfo(x.status), applied = new Date(x.ts).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+    return '<div class="lit"><div class="lh"><b>' + esc(x.n) + " · " + esc(x.type) + "</b><span>" + esc(fmtLv(x.start)) + " → " + esc(fmtLv(x.end)) + "</span></div>" +
+      '<div class="sub" style="font-size:11px">Applied ' + esc(applied) + (x.excl === "Yes" ? " · Except Holiday &amp; Week Off" : "") + "</div>" +
+      '<div class="lr"><div class="lrt">' + esc(x.reason || "—") + (x.pl.length ? " · " + x.pl.map((u, i) => aLink(u, "📎 " + (i + 1))).join(" ") : "") + '</div><span class="st ' + st.c + '">' + esc(st.l) + "</span></div></div>";
+  }).join("");
+}
+
 /* ===== ASSAM SALE ===== */
 const dayName = d => { const m = String(d).match(/^(\d{4})-(\d{2})-(\d{2})$/); return m ? new Date(+m[1], +m[2] - 1, +m[3]).toLocaleDateString("en-GB", { weekday: "long" }) : ""; };
 const dayNum = d => { const m = String(d).match(/^(\d{4})-(\d{2})-(\d{2})$/); return m ? new Date(+m[1], +m[2] - 1, +m[3]).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : d; };
@@ -1302,6 +1401,8 @@ const TAB_HELP = {
   attendance: { t: "❓ Attendance", h: "<ul><li>Tap <b>Login</b> to start your day and <b>Logout</b> when you finish.</li><li>Location is captured automatically. Take a photo if your account requires it.</li><li>No internet? Your entry is saved on the phone and uploaded later.</li><li>If you forget to logout, the session is closed automatically the next day.</li></ul>" },
   leave: { t: "❓ Leave", h: "<ul><li><b>Apply Leave:</b> choose CL, SL, HD1, HD2 or W/O, pick the dates, add a reason and your WhatsApp number.</li><li>For Sick Leave you can attach photos (optional).</li><li><b>My Requests:</b> shows every request with its status — green Approved, light red Cancel, dark red Not Approved, gold Pending.</li><li>A submitted request cannot be edited in the app. Ask your admin for corrections.</li></ul>" },
   dashboard: { t: "❓ Dashboard", h: "<ul><li><b>Sales:</b> pick 3, 6 or 12 months to compare sales with target. <b>Party wise</b> shows sales by party for a date range (needs internet).</li><li><b>Office:</b> Weekly Score, leave balance, <b>Weekly Pending</b> tasks and today's <b>Daily Task</b> forms.</li><li>The page shows the last saved data when offline. Tap <b>Refresh</b> for the latest.</li><li>Tap <b>⛶</b> for full screen (it turns the phone view to landscape) and <b>⬇</b> to download the report as an image.</li><li>Admin accounts see the Office Staff / Sales Man overall reports and can open any user's dashboard.</li></ul>" },
+  aatt: { t: "❓ Attendance (Admin)", h: "<ul><li>Opens with <b>today's</b> attendance of everyone.</li><li>Pick a <b>From</b> and <b>To</b> date and tap <b>Show</b> to see any period (up to 3 months).</li><li>Each line shows login and logout time, working hours, and links to the location and photo.</li></ul>" },
+  aleave: { t: "❓ Leave (Admin)", h: "<ul><li>Shows every leave request of every user, newest first, with its current status.</li><li>Green = Approved, light red = Cancel, dark red = Not Approved, gold = Pending.</li><li>Use the filter to see only one status. Change the status in the Google Sheet (LEAVE tab, column J) and tap Refresh.</li></ul>" },
   assam: { t: "❓ Assam Sale", h: "<ul><li>Dates of the running month are listed from the 1st to the last day. Sundays are shown in red.</li><li>Enter <b>Qty (Ton)</b> and <b>Amount</b> on an empty line and tap ✓. You can fill any team member's line.</li><li>A saved line cannot be changed from the app.</li><li>Offline entries are uploaded automatically later.</li></ul>" }
 };
 
