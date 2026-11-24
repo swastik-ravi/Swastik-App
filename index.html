@@ -102,6 +102,7 @@ input[type=date]{color-scheme:dark}
 .st.yes{background:#3FA34D;color:#fff}
 .st.can{background:#F28B82;color:#14120E}
 .st.no{background:#C62828;color:#fff}
+.st.lop{background:#D9CCF0;color:#4A148C}
 .st.pend{background:rgba(240,180,41,.18);color:var(--gold)}
 .st.up{background:rgba(255,255,255,.1);color:var(--mut)}
 
@@ -233,7 +234,7 @@ select option,select optgroup{background:#1C1913;color:var(--cream)}
     <div class="dhead"><button class="btn ghost" onclick="show('home');render()">← Back</button><button class="btn ghost" onclick="loadAdminLeave()">⟳ Refresh</button><span class="dots" onclick="openInfo('aleave',1)">⋮</span></div>
     <div class="dtitle" style="margin-top:0">LEAVE REQUESTS · ALL USERS</div>
     <select id="alFilter" onchange="renderAdminLeave()" style="width:100%;padding:12px;border-radius:10px;font-size:15px;background:rgba(255,255,255,.06);color:var(--cream);border:1px solid rgba(240,180,41,.3);margin-bottom:10px">
-      <option value="">All status</option><option value="pend">Pending</option><option value="yes">Approved</option><option value="no">Not Approved</option><option value="can">Cancel</option>
+      <option value="">All status</option><option value="pend">Pending</option><option value="yes">Approved</option><option value="no">Not Approved</option><option value="can">Cancel</option><option value="lop">LOP</option>
     </select>
     <div class="sub" id="alSum" style="margin:0 0 10px"></div>
     <div id="alBody"></div>
@@ -249,6 +250,10 @@ select option,select optgroup{background:#1C1913;color:var(--cream)}
       <button type="button" class="cap" id="camLbl" onclick="takePhoto()">📷 Take photo</button>
       <input id="cam" type="file" accept="image/*" capture="user" hidden onchange="onPhoto(event)">
       <br><img id="prev" alt="">
+    </div>
+    <div id="manLoc" style="display:none;margin-bottom:14px">
+      <div class="sub" style="color:#F0B429;text-align:center;margin-bottom:8px">Unable to take location, kindly type manually</div>
+      <input id="manLocIn" type="text" maxlength="80" placeholder="Type your area / place name" autocomplete="off" oninput="manLocInput()" style="margin-bottom:0">
     </div>
     <button class="btn" id="attBtn" onclick="attAction()" disabled>Login</button>
     <div class="sub" id="gps" style="text-align:center;margin-top:12px">Finding your location…</div>
@@ -457,18 +462,30 @@ async function renderAtt(st) {
   const b = $("attBtn");
   b.textContent = st.open ? "Logout" : "Login";
   b.className = "btn" + (st.open ? " out" : "");
-  b.disabled = !S.coords || S.proc;
+  b.disabled = !(S.coords || manOk()) || S.proc;
 }
+
+/* Location: for the first 30 seconds it works exactly as before. If there is still no location after that,
+   a box opens under the photo so the person can type the area name and the entry can be submitted. */
+const manVal = () => ($("manLocIn") ? $("manLocIn").value : "").replace(/\s+/g, " ").trim();
+const manOk = () => !!$("manLoc") && $("manLoc").style.display === "block" && manVal().length >= 3;
+function showManLoc() { if (S.coords) return; $("manLoc").style.display = "block"; render(); }
+function hideManLoc() { $("manLoc").style.display = "none"; $("manLocIn").value = ""; }
+function manLocInput() { render(); }
 
 function fetchLoc() {
   const note = $("gps");
-  if (!navigator.geolocation) { note.textContent = "This phone does not support location."; return; }
-  const ok = pos => { S.coords = { lat: pos.coords.latitude, lng: pos.coords.longitude }; note.textContent = "Location ready ✓"; render(); };
+  clearTimeout(S.locTimer); hideManLoc();
+  if (!navigator.geolocation) { note.textContent = "This phone does not support location."; showManLoc(); return; }
+  const ok = pos => { clearTimeout(S.locTimer); S.coords = { lat: pos.coords.latitude, lng: pos.coords.longitude }; note.textContent = "Location ready ✓"; hideManLoc(); render(); };
+  S.locTimer = setTimeout(() => { if (!S.coords) { note.textContent = "Location not found."; showManLoc(); } }, 30000);
   // quick rough fix first, precise fix replaces it a moment later
   navigator.geolocation.getCurrentPosition(ok, () => {}, { enableHighAccuracy: false, timeout: 4000, maximumAge: 300000 });
-  navigator.geolocation.getCurrentPosition(ok, () => {
-    if (!S.coords) note.textContent = "Location is required. Turn on GPS, allow location, then reopen this screen.";
-  }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 });
+  navigator.geolocation.getCurrentPosition(ok, err => {
+    if (S.coords) return;
+    note.textContent = err && err.code === 1 ? "Location permission is off. Please allow location for this app." : "Location not found.";
+    if (err && err.code === 3) showManLoc();
+  }, { enableHighAccuracy: true, timeout: 30000, maximumAge: 60000 });
 }
 
 function onPhoto(ev) {
@@ -493,18 +510,19 @@ function onPhoto(ev) {
 
 async function attAction() {
   const pf = S.session.profile, msg = $("attMsg");
-  if (!S.coords) { msg.textContent = "Location is required."; return; }
+  const man = !S.coords && manOk() ? manVal() : "";
+  if (!S.coords && !man) { msg.textContent = $("manLoc").style.display === "block" ? "Please type your location (at least 3 letters)." : "Location is required."; return; }
   if (pf.photoRequired && !S.photo) { msg.textContent = "Photo is required for your account."; return; }
   const st = await derive();
   const op = {
     opId: crypto.randomUUID(), type: st.open ? "logout" : "login",
     entryId: st.open ? st.open.entryId : crypto.randomUUID(),   // made on the phone so a retry can never create a duplicate row
-    ts: Date.now(), lat: S.coords.lat, lng: S.coords.lng, photo: S.photo || ""
+    ts: Date.now(), lat: S.coords ? S.coords.lat : null, lng: S.coords ? S.coords.lng : null, manualLoc: man, photo: S.photo || ""
   };
   await outPut(op);                       // saved on the phone first — works with any net
   bgSync();
   msg.textContent = "";
-  S.photo = null; $("prev").style.display = "none"; $("cam").value = "";
+  S.photo = null; $("prev").style.display = "none"; $("cam").value = ""; $("manLocIn").value = "";
   if (op.type === "logout" && WIPE_ON_ATT_LOGOUT) await kvSet("wipe", true);
   await render();
   sync();
@@ -621,7 +639,7 @@ function renderDash() {
 
 /* crisp canvas on phone screens */
 function cv(c, w, h) {
-  const k = S.fsK || 1, dpr = S.exp || window.devicePixelRatio || 1;
+  const k = (c.dataset && c.dataset.sm && !S.exp) ? 1 : (S.fsK || 1), dpr = S.exp || window.devicePixelRatio || 1;   // sales charts stay at normal size in View
   c.width = Math.round(w * k * dpr); c.height = Math.round(h * k * dpr);
   c.style.width = (w * k) + "px"; c.style.height = (h * k) + "px";
   const x = c.getContext("2d"); x.setTransform(dpr * k, 0, 0, dpr * k, 0, 0);
@@ -640,9 +658,9 @@ function renderSales(d) {
     '</div>' +
     '<div class="msg" id="pwMsg" style="margin:0 0 6px"></div>' +
     '<div class="dtitle" id="dChartTitle">SALES vs TARGET (TN)</div>' +
-    '<div class="cwrap"><canvas id="cSales"></canvas></div>' +
-    '<div class="dtitle">THIS MONTH ATTENDANCE</div>' +
-    '<div style="display:flex;justify-content:center"><canvas id="cDonut"></canvas></div>';
+    '<div class="cwrap"><canvas id="cSales" data-sm="1"></canvas></div>' +
+    '<div class="dtitle">LEAVE BALANCE · THIS MONTH ATTENDANCE</div>' +
+    '<div style="display:flex;justify-content:center"><canvas id="cDonut" data-sm="1"></canvas></div>';
   $("dRange").value = S.dRange;
   if (S.pw) {   // Party wise was open: keep showing it (for example after full screen)
     $("pwRow").style.display = "flex"; $("pwFrom").value = S.pw.from; $("pwTo").value = S.pw.to;
@@ -687,39 +705,55 @@ async function showPW() {
   } catch (e) { msg.style.color = ""; msg.textContent = "Network problem — please try again."; }
 }
 
+const MON3 = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const updTxt = v => { const m = String(v || "").match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? m[3] + "-" + MON3[+m[2] - 1] : ""; };
+
 function drawBars(canvas, rows) {
-  const bw = 46, gap = 22, ch = 180, ls = 46;
+  const sm = inFs() && !S.exp;   // View (full screen): thinner columns and smaller text, so more data fits on the screen
+  const hasU = rows.some(s => s.upd);
+  const bw = sm ? 30 : 46, gap = 22, ch = sm ? 140 : 180, ls = (sm ? 36 : 46) + (hasU ? 24 : 0);
   const w = Math.max(320, rows.length * (bw + gap) + gap), h = ch + ls;
   const x = cv(canvas, w, h); x.clearRect(0, 0, w, h);
   const mx = Math.max.apply(null, rows.map(s => Math.max(s.achieved, s.target)).concat([1]));
   x.textAlign = "center";
   rows.forEach((s, i) => {
-    const px = gap + i * (bw + gap), ah = s.achieved / mx * ch, ty = ch - s.target / mx * ch;
+    const px = gap + i * (bw + gap), ah = s.achieved / mx * ch, ty = ch - s.target / mx * ch, mid = px + bw / 2;
     x.fillStyle = s.percentage >= 100 ? "#3FA34D" : "#F0B429";
     x.fillRect(px, ch - ah, bw, ah);
     x.strokeStyle = "#E36A6A"; x.setLineDash([4, 3]);
     x.beginPath(); x.moveTo(px - 4, ty); x.lineTo(px + bw + 4, ty); x.stroke(); x.setLineDash([]);
-    x.fillStyle = "#F0B429"; x.font = "bold 11px Arial";
-    x.fillText(s.percentage + "%", px + bw / 2, ch - ah - 6);
-    x.fillStyle = "#B8AF9B"; x.font = "10px Arial";
-    x.fillText(s.month, px + bw / 2, ch + 16);
-    x.fillStyle = "#D8CBA5"; x.font = "bold 11px Arial";
-    x.fillText(s.achieved + " TN", px + bw / 2, ch + 30);
+    x.fillStyle = "#F0B429"; x.font = "bold " + (sm ? 9 : 11) + "px Arial";
+    x.fillText(s.percentage + "%", mid, ch - ah - 6);
+    x.fillStyle = "#B8AF9B"; x.font = (sm ? 8 : 10) + "px Arial";
+    x.fillText(s.month, mid, ch + (sm ? 14 : 16));
+    x.fillStyle = "#D8CBA5"; x.font = "bold " + (sm ? 9 : 11) + "px Arial";
+    x.fillText(s.achieved + " TN", mid, ch + (sm ? 26 : 30));
+    if (s.upd) {   // running month only: until which date the sale data is updated
+      x.fillStyle = "#8FDB9C"; x.font = (sm ? 8 : 9) + "px Arial";
+      x.fillText("Updated Till", mid, ch + (sm ? 38 : 43));
+      x.fillText(updTxt(s.upd), mid, ch + (sm ? 48 : 54));
+    }
   });
 }
 
+/* Sales: leave ring (same as Office staff, shrinks as leaves are used) + attendance as one column beside it */
 function drawDonut(canvas, att) {
-  const size = 200, x = cv(canvas, size, size), cx = size / 2, cy = size / 2, r = 80, lw = 22;
-  const frac = att.totalWorkingDaysInMonth > 0 ? Math.min(1, att.presentDaysThisMonth / att.totalWorkingDaysInMonth) : 0;
-  x.clearRect(0, 0, size, size);
-  x.beginPath(); x.arc(cx, cy, r, 0, Math.PI * 2); x.strokeStyle = "rgba(255,255,255,0.08)"; x.lineWidth = lw; x.stroke();
-  x.beginPath(); x.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2);
-  x.strokeStyle = "#F0B429"; x.lineWidth = lw; x.lineCap = "round"; x.stroke();
-  x.textAlign = "center";
-  x.fillStyle = "#FBF6EC"; x.font = "bold 26px Arial"; x.fillText(att.leavesRemaining == null ? "–" : att.leavesRemaining, cx, cy - 2);
-  x.font = "11px Arial"; x.fillStyle = "#B8AF9B"; x.fillText("Leaves left", cx, cy + 18);
-  x.font = "12px Arial"; x.fillStyle = "#D8CBA5";
-  x.fillText(att.presentDaysThisMonth + " / " + att.totalWorkingDaysInMonth + " days present", cx, cy + r + 34);
+  const W = 290, H = 190, x = cv(canvas, W, H);
+  x.clearRect(0, 0, W, H); x.textAlign = "center";
+  x.fillStyle = "#D8CBA5"; x.font = "bold 11px Arial"; x.fillText("LEAVE BALANCE", 80, 16);
+  ringLeave(x, 80, 96, 50, 15, att.leavesRemaining, att.leaveMax || 13);
+
+  const present = att.presentDaysThisMonth || 0;
+  const base = att.workingDaysSoFar > 0 ? att.workingDaysSoFar : att.totalWorkingDaysInMonth;   // % of the working days that have passed
+  const pct = base > 0 ? Math.min(100, Math.round(present / base * 100)) : 0;
+  const cx = 215, bw = 44, top = 50, bot = 150, bh = bot - top;
+  x.fillStyle = "#D8CBA5"; x.font = "bold 11px Arial"; x.fillText("ATTENDANCE", cx, 16);
+  x.fillStyle = "rgba(255,255,255,0.08)"; x.fillRect(cx - bw / 2, top, bw, bh);
+  const fh = Math.round(bh * pct / 100);
+  x.fillStyle = "#F0B429"; x.fillRect(cx - bw / 2, bot - fh, bw, fh);
+  x.fillStyle = "#FBF6EC"; x.font = "bold 16px Arial"; x.fillText(pct + "%", cx, top - 8);
+  x.font = "bold 13px Arial"; x.fillText(present + (present === 1 ? " Day" : " Days"), cx, bot + 18);
+  x.fillStyle = "#B8AF9B"; x.font = "9px Arial"; x.fillText("of " + base + " working days", cx, bot + 32);
 }
 
 /* ---------- OFFICE dashboard ---------- */
@@ -803,8 +837,11 @@ function lvColor(v) {
 }
 
 function drawLeave(canvas, bal, max) {
-  const size = 130, x = cv(canvas, size, size), cx = size / 2, cy = size / 2, r = 50, lw = 15;
+  const size = 130, x = cv(canvas, size, size);
   x.clearRect(0, 0, size, size);
+  ringLeave(x, size / 2, size / 2, 50, 15, bal, max);
+}
+function ringLeave(x, cx, cy, r, lw, bal, max) {
   x.beginPath(); x.arc(cx, cy, r, 0, Math.PI * 2); x.strokeStyle = "rgba(255,255,255,0.08)"; x.lineWidth = lw; x.stroke();
   if (bal != null && bal > 0) {
     const total = Math.min(1, bal / max) * 360, step = 2;
@@ -954,6 +991,7 @@ function statusInfo(s) {
   const t = String(s || "").trim(), l = t.toLowerCase();
   if (l === "__up") return { c: "up", l: "Uploading…" };
   if (!t) return { c: "pend", l: "Pending" };
+  if (/\blop\b/i.test(t)) return { c: "lop", l: t };
   if (l.indexOf("not") >= 0) return { c: "no", l: t };
   if (l.indexOf("cancel") >= 0) return { c: "can", l: t };
   if (l.indexOf("approv") >= 0) return { c: "yes", l: t };
@@ -1264,6 +1302,7 @@ function renderAdminAtt(r, from, to) {
     html += '<div class="lit"><div class="lh"><b>' + esc(x.n) + "</b><span>" + esc(x.u) + "</span></div>" +
       '<div class="aat">In <b>' + esc(x.inT || "—") + "</b> → Out <b>" + out + "</b>" + (x.hrs ? " · " + esc(x.hrs) : "") + "</div>" +
       (links ? '<div class="aal">' + links + "</div>" : "") +
+      (x.inMan || x.outMan ? '<div class="sub" style="font-size:11px;margin-top:6px;color:#F0B429">✍ Manual location — ' + esc([x.inMan ? "In: " + x.inMan : "", x.outMan ? "Out: " + x.outMan : ""].filter(Boolean).join(" · ")) + "</div>" : "") +
       (x.note ? '<div class="sub" style="font-size:11px;margin-top:6px">' + esc(x.note) + "</div>" : "") + "</div>";
   });
   body.innerHTML = html;
@@ -1386,7 +1425,7 @@ const INFO = {
     "<h4>1. Login</h4><p>Use the username and password given by your admin. You stay logged in, just like WhatsApp, so you do not have to type them again. Tap <b>Sign out</b> only when you want to remove your account from this phone.</p>" +
     "<h4>2. Works without internet</h4><p>Attendance, Leave and Assam Sale entries are saved on your phone first and upload automatically when the internet is back. On Android this usually happens even if the app is closed. A bar at the top of the home screen shows how many entries are still waiting.</p>" +
     "<h4>3. Attendance</h4><ul><li>Tap <b>Attendance</b>, then <b>Login</b> to start your day and <b>Logout</b> when you finish.</li><li>Your location is required; a photo too if your account needs one.</li></ul>" +
-    "<h4>4. Leave</h4><ul><li>Tap <b>Leave</b>, choose the type, dates and reason, then submit.</li><li>Open <b>My Requests</b> to see the status: green = Approved, light red = Cancel, dark red = Not Approved.</li></ul>" +
+    "<h4>4. Leave</h4><ul><li>Tap <b>Leave</b>, choose the type, dates and reason, then submit.</li><li>Open <b>My Requests</b> to see the status: green = Approved, light red = Cancel, dark red = Not Approved, purple = LOP.</li></ul>" +
     "<h4>5. Dashboard</h4><p>Tap the card at the top of the home screen to see your performance: sales vs target and attendance for sales people, weekly score, leave balance and tasks for office staff.</p>" +
     "<h4>6. Assam Sale</h4><p>Only for people with permission. Fill Quantity (Ton) and Approx Amount against a date. A saved entry cannot be changed.</p>" +
     "<h4>Install on your phone</h4><p>Open the app link in Chrome, tap the menu and choose <b>Add to Home screen</b> / <b>Install app</b>.</p>" +
@@ -1398,11 +1437,11 @@ const INFO = {
     "<div class='about-line'><b>App:</b> Swastik App</div><div class='about-line'><b>Company:</b> Jay Baba Bakreswar Rice Mill Pvt. Ltd</div><div class='about-line'><b>Version:</b> v2.0</div><div class='about-line'><b>Type:</b> Installable web app (PWA)</div><div class='about-line'><b>Developed by:</b> Ravi Mandal</div>" }
 };
 const TAB_HELP = {
-  attendance: { t: "❓ Attendance", h: "<ul><li>Tap <b>Login</b> to start your day and <b>Logout</b> when you finish.</li><li>Location is captured automatically. Take a photo if your account requires it.</li><li>No internet? Your entry is saved on the phone and uploaded later.</li><li>If you forget to logout, the session is closed automatically the next day.</li></ul>" },
-  leave: { t: "❓ Leave", h: "<ul><li><b>Apply Leave:</b> choose CL, SL, HD1, HD2 or W/O, pick the dates, add a reason and your WhatsApp number.</li><li>For Sick Leave you can attach photos (optional).</li><li><b>My Requests:</b> shows every request with its status — green Approved, light red Cancel, dark red Not Approved, gold Pending.</li><li>A submitted request cannot be edited in the app. Ask your admin for corrections.</li></ul>" },
+  attendance: { t: "❓ Attendance", h: "<ul><li>Tap <b>Login</b> to start your day and <b>Logout</b> when you finish.</li><li>Location is captured automatically. If it is not found within 30 seconds, type your area name in the box under the photo. Take a photo if your account requires it.</li><li>No internet? Your entry is saved on the phone and uploaded later.</li><li>If you forget to logout, the session is closed automatically the next day.</li></ul>" },
+  leave: { t: "❓ Leave", h: "<ul><li><b>Apply Leave:</b> choose CL, SL, HD1, HD2 or W/O, pick the dates, add a reason and your WhatsApp number.</li><li>For Sick Leave you can attach photos (optional).</li><li><b>My Requests:</b> shows every request with its status — green Approved, light red Cancel, dark red Not Approved, purple LOP, gold Pending.</li><li>A submitted request cannot be edited in the app. Ask your admin for corrections.</li></ul>" },
   dashboard: { t: "❓ Dashboard", h: "<ul><li><b>Sales:</b> pick 3, 6 or 12 months to compare sales with target. <b>Party wise</b> shows sales by party for a date range (needs internet).</li><li><b>Office:</b> Weekly Score, leave balance, <b>Weekly Pending</b> tasks and today's <b>Daily Task</b> forms.</li><li>The page shows the last saved data when offline. Tap <b>Refresh</b> for the latest.</li><li>Tap <b>⛶</b> for full screen (it turns the phone view to landscape) and <b>⬇</b> to download the report as an image.</li><li>Admin accounts see the Office Staff / Sales Man overall reports and can open any user's dashboard.</li></ul>" },
   aatt: { t: "❓ Attendance (Admin)", h: "<ul><li>Opens with <b>today's</b> attendance of everyone.</li><li>Pick a <b>From</b> and <b>To</b> date and tap <b>Show</b> to see any period (up to 3 months).</li><li>Each line shows login and logout time, working hours, and links to the location and photo.</li></ul>" },
-  aleave: { t: "❓ Leave (Admin)", h: "<ul><li>Shows every leave request of every user, newest first, with its current status.</li><li>Green = Approved, light red = Cancel, dark red = Not Approved, gold = Pending.</li><li>Use the filter to see only one status. Change the status in the Google Sheet (LEAVE tab, column J) and tap Refresh.</li></ul>" },
+  aleave: { t: "❓ Leave (Admin)", h: "<ul><li>Shows every leave request of every user, newest first, with its current status.</li><li>Green = Approved, light red = Cancel, dark red = Not Approved, purple = LOP, gold = Pending.</li><li>Use the filter to see only one status. Change the status in the Google Sheet (LEAVE tab, column J) and tap Refresh.</li></ul>" },
   assam: { t: "❓ Assam Sale", h: "<ul><li>Dates of the running month are listed from the 1st to the last day. Sundays are shown in red.</li><li>Enter <b>Qty (Ton)</b> and <b>Amount</b> on an empty line and tap ✓. You can fill any team member's line.</li><li>A saved line cannot be changed from the app.</li><li>Offline entries are uploaded automatically later.</li></ul>" }
 };
 
