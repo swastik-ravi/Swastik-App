@@ -708,39 +708,57 @@ async function showPW() {
 const MON3 = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const updTxt = v => { const m = String(v || "").match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? m[3] + "-" + MON3[+m[2] - 1] : ""; };
 
+/* ===== SALES CHART SIZE: change only the numbers in this block ===== */
+const CH = {
+  barW: 46, gap: 22, height: 180,                    // normal screen: bar width, space between bars, chart height (px)
+  viewBarW: 44, viewGap: 34, viewHeight: 260,        // View with MORE than fitMax columns (Party wise): fixed standard size, scrolls sideways
+  fitMax: 12, fitMaxSlot: 84, fitMinH: 150, fitMaxH: 320,   // View with up to fitMax columns (12 months): bars share the screen width
+  fPct: 11, fLabel: 10, fTn: 11, fUpd: 9,            // text sizes (px): % above bar, name/month, TN value, Updated Till
+  lineGap: 15                                        // space between the name line and the TN line (px)
+};
+
 function drawBars(canvas, rows) {
   const view = inFs() && !S.exp, n = Math.max(rows.length, 1), hasU = rows.some(s => s.upd);
-  let bw = 46, gap = 22, ch = 180, f = 1, w, ox = 0, step;
-  if (view) {
-    // View (full screen): the columns share the whole screen width, so all 12 months are visible together
-    // on a phone and on a computer. Text size follows the column width.
-    const avail = Math.max(300, innerWidth - 32), slot = Math.min(avail / n, 84);
+  const fit = view && rows.length <= CH.fitMax;      // few columns: fit the screen. Many columns: standard size + scroll
+  let bw = CH.barW, gap = CH.gap, ch = CH.height, f = 1, w, ox = gap, step = bw + gap;
+  if (fit) {
+    const avail = Math.max(300, innerWidth - 32), slot = Math.min(avail / n, CH.fitMaxSlot);
     step = slot; gap = slot * 0.34; bw = slot - gap; w = avail; ox = (avail - slot * n) / 2 + gap / 2;
-    ch = Math.max(150, Math.min(320, Math.round(innerHeight * 0.4)));
+    ch = Math.max(CH.fitMinH, Math.min(CH.fitMaxH, Math.round(innerHeight * 0.4)));
     f = Math.max(0.85, Math.min(1.5, slot / 52));
-  } else { step = bw + gap; w = Math.max(320, n * step + gap); ox = gap; }
-  const narrow = view && step < 56, tiny = view && step < 46;
-  const h = ch + Math.round((hasU ? 80 : 52) * f);
+  } else {
+    if (view) { bw = CH.viewBarW; gap = CH.viewGap; ch = CH.viewHeight; }
+    step = bw + gap; ox = gap / 2 + 4; w = n * step + gap;
+    if (!view) w = Math.max(320, w);
+  }
+  const narrow = fit && step < 56, tiny = fit && step < 46, lg = CH.lineGap * f;
+  const h = ch + Math.round(lg * 2 + 30 * f + (hasU ? 30 * f : 0));
   const x = cv(canvas, w, h); x.clearRect(0, 0, w, h);
   const mx = Math.max.apply(null, rows.map(s => Math.max(s.achieved, s.target)).concat([1]));
   const fnt = (px, bold) => (bold ? "bold " : "") + (Math.round(px * f * 10) / 10) + "px Arial";
-  const put = (t, mid, y) => { const hw = x.measureText(t).width / 2; x.fillText(t, Math.max(hw + 1, Math.min(w - hw - 1, mid)), y); };   // never cut at the screen edge
+  // writes text centred on the bar; if it is wider than its own column it is cut with "…" so texts never touch or overlap
+  const put = (t, mid, y) => {
+    const maxW = step - 4; t = String(t);
+    while (t.length > 1 && x.measureText(t).width > maxW) t = t.slice(0, -2) + "…";
+    const hw = x.measureText(t).width / 2;
+    x.fillText(t, Math.max(hw + 1, Math.min(w - hw - 1, mid)), y);
+  };
   x.textAlign = "center";
   rows.forEach((s, i) => {
-    const px = ox + i * step, ah = s.achieved / mx * (ch - 18), ty = ch - s.target / mx * (ch - 18), mid = px + bw / 2;   // 18px kept free on top for the % text
+    const px = ox + i * step, ah = s.achieved / mx * (ch - 18), ty = ch - s.target / mx * (ch - 18), mid = px + bw / 2;
     x.fillStyle = s.percentage >= 100 ? "#3FA34D" : "#F0B429";
     x.fillRect(px, ch - ah, bw, ah);
     x.strokeStyle = "#E36A6A"; x.setLineDash([4, 3]);
     x.beginPath(); x.moveTo(px - 3, ty); x.lineTo(px + bw + 3, ty); x.stroke(); x.setLineDash([]);
-    x.fillStyle = "#F0B429"; x.font = fnt(11, true); put(s.percentage + "%", mid, ch - ah - 6);
+    x.fillStyle = "#F0B429"; x.font = fnt(CH.fPct, true); put(s.percentage + "%", mid, ch - ah - 6);
     let lab = String(s.month);
-    if (narrow) lab = /^[A-Za-z]{3,} \d{4}$/.test(lab) ? lab.slice(0, 3) : lab.slice(0, Math.max(3, Math.floor(step / 6)));
-    x.fillStyle = "#B8AF9B"; x.font = fnt(10); put(lab, mid, ch + 16 * f);
-    x.fillStyle = "#D8CBA5"; x.font = fnt(11, true);
-    put(tiny ? String(Math.round(s.achieved * 10) / 10) : s.achieved + " TN", mid, ch + 30 * f);
+    if (narrow && /^[A-Za-z]{3,} \d{4}$/.test(lab)) lab = lab.slice(0, 3);
+    x.fillStyle = "#B8AF9B"; x.font = fnt(CH.fLabel); put(lab, mid, ch + 16 * f);
+    x.fillStyle = "#D8CBA5"; x.font = fnt(CH.fTn, true);
+    put(tiny ? String(Math.round(s.achieved * 10) / 10) : s.achieved + " TN", mid, ch + 16 * f + lg);
     if (s.upd) {   // running month only: until which date the sale data is updated
-      x.fillStyle = "#8FDB9C"; x.font = fnt(9);
-      put("Updated Till", mid, ch + 43 * f); put(updTxt(s.upd), mid, ch + 55 * f);
+      x.fillStyle = "#8FDB9C"; x.font = fnt(CH.fUpd);
+      put("Updated Till", mid, ch + 16 * f + lg * 2); put(updTxt(s.upd), mid, ch + 16 * f + lg * 3 - 2);
     }
   });
 }
