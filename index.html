@@ -398,6 +398,7 @@ async function doLogin() {
     S.session = { token: r.token, exp: r.exp, profile: r.profile };
     await kvSet("session", S.session); await kvSet("snap", r.attendance); await kvSet("holidays", r.holidays);
     await kvSet("wipe", false); await kvSet("lastOnline", Date.now()); S.needLogin = false; S.err = ""; $("p").value = "";
+    if (r.details) { S.details = r.details; await kvSet("details", r.details); }
     S.dash = null; await kvSet("dash", null);   // never show a previous user's dashboard
     S.leaves = null; await kvSet("leaves", null);
     S.assam = null; await kvSet("assam", null); S.adm = null; S.pw = null; S.dMode = "mine";
@@ -434,7 +435,7 @@ async function sync() {
 /* Clear the phone only when nothing is left waiting */
 async function afterSync() {
   if ((await outAll()).length === 0 && (await kvGet("wipe"))) {
-    await wipeAll(); S.session = null; S.dash = null; S.leaves = null; S.assam = null; S.adm = null; S.err = "";
+    await wipeAll(); S.session = null; S.details = null; S.dash = null; S.leaves = null; S.assam = null; S.adm = null; S.err = "";
     $("pill").className = "pill"; show("login");
   }
 }
@@ -533,7 +534,7 @@ function togglePw() { const p = $("p"), b = $("pwBtn"), h = p.type === "password
 
 async function maybeRefresh(force) {
   if (S.busy || !S.session || !navigator.onLine) return;
-  if (!force && Date.now() - ((await kvGet("lastRefresh")) || 0) < 3600000) return;
+  if (!force && S.details && Date.now() - ((await kvGet("lastRefresh")) || 0) < 3600000) return;   // refreshes at once if the help texts are not on the phone yet
   S.busy = true;
   let refreshed = false;
   try {
@@ -543,6 +544,7 @@ async function maybeRefresh(force) {
       S.session = { token: r.token, exp: r.exp, profile: r.profile };
       await kvSet("session", S.session); await kvSet("snap", r.attendance); await kvSet("holidays", r.holidays);
       await kvSet("lastOnline", Date.now()); await kvSet("lastRefresh", Date.now()); S.needLogin = false;
+      if (r.details) { S.details = r.details; await kvSet("details", r.details); }
       refreshed = true;
     }
   } catch (e) { /* no net: keep working from the phone */ }
@@ -553,7 +555,7 @@ async function maybeRefresh(force) {
 async function checkGate() {
   let last = await kvGet("lastOnline");
   if (!last) { last = Date.now(); await kvSet("lastOnline", last); }
-  if (Date.now() - last > OFFLINE_DAYS * 86400000) { show("gate"); return true; }
+  if (Date.now() - last > offDays() * 86400000) { show("gate"); return true; }
   return false;
 }
 
@@ -598,7 +600,7 @@ function closeCam(keepMark) {
 function openDash() {
   S.pw = null;
   show("dash"); renderDash();
-  if (!S.dash || Date.now() - (S.dash.fetchedAt || 0) > DASH_STALE_MS) fetchDash();
+  if (!S.dash || Date.now() - (S.dash.fetchedAt || 0) > dashStale()) fetchDash();
 }
 function refreshDash() {
   if (!navigator.onLine) { alert("Internet connection is needed to refresh."); return; }
@@ -886,10 +888,6 @@ function ringLeave(x, cx, cy, r, lw, bal, max) {
 }
 
 /* ===== LEAVE ===== */
-const LEAVE_TYPES = [
-  { c: "CL", s: "Casual Leave" }, { c: "SL", s: "Sick Leave" },
-  { c: "HD1", s: "Half Day (10-14)" }, { c: "HD2", s: "Half Day (14-19)" }, { c: "W/O", s: "Week Off" }
-];
 const fmtLv = s => {
   const m = String(s || "").match(/^(\d{4})-(\d{2})-(\d{2})/);
   return m ? new Date(+m[1], +m[2] - 1, +m[3]).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : String(s || "");
@@ -914,9 +912,9 @@ function renderLeave() {
 }
 
 function leaveFormHtml() {
-  const types = LEAVE_TYPES.map(t =>
+  const lts = leaveTypes(), types = (lts.length ? lts : []).map(t =>
     '<div class="lbtn' + (S.lv.type === t.c ? " on" : "") + '" data-t="' + t.c + '" onclick="pickLeave(\'' + t.c + '\')">' + t.c + "<small>" + t.s + "</small></div>").join("");
-  return '<div class="lgrid">' + types + "</div>" +
+  return (lts.length ? '<div class="lgrid">' + types + "</div>" : '<p class="sub" style="margin:0 0 16px">Leave types will load when you are online. Please try again in a moment.</p>') +
     '<div id="lvPhotoWrap" style="display:none;margin-bottom:16px">' +
       '<button type="button" class="cap" onclick="$(\'lvPhotos\').click()">📎 Add photo (optional — prescription / document)</button>' +
       '<input id="lvPhotos" type="file" accept="image/*" multiple hidden onchange="onLvPhotos(event)"><div class="thumbs" id="lvThumbs"></div>' +
@@ -1447,30 +1445,13 @@ function bgSync() {
 }
 
 /* ===== HELP / ABOUT (⋮ menus) ===== */
-const INFO = {
-  howto: { t: "❓ How to Use", h:
-    "<h4>1. Login</h4><p>Use the username and password given by your admin. You stay logged in, just like WhatsApp, so you do not have to type them again. Tap <b>Sign out</b> only when you want to remove your account from this phone.</p>" +
-    "<h4>2. Works without internet</h4><p>Attendance, Leave and Assam Sale entries are saved on your phone first and upload automatically when the internet is back. On Android this usually happens even if the app is closed. A bar at the top of the home screen shows how many entries are still waiting.</p>" +
-    "<h4>3. Attendance</h4><ul><li>Tap <b>Attendance</b>, then <b>Login</b> to start your day and <b>Logout</b> when you finish.</li><li>Your location is required; a photo too if your account needs one.</li></ul>" +
-    "<h4>4. Leave</h4><ul><li>Tap <b>Leave</b>, choose the type, dates and reason, then submit.</li><li>Open <b>My Requests</b> to see the status: green = Approved, light red = Cancel, dark red = Not Approved, purple = LOP.</li></ul>" +
-    "<h4>5. Dashboard</h4><p>Tap the card at the top of the home screen to see your performance: sales vs target and attendance for sales people, weekly score, leave balance and tasks for office staff.</p>" +
-    "<h4>6. Assam Sale</h4><p>Only for people with permission. Fill Quantity (Ton) and Approx Amount against a date. A saved entry cannot be changed.</p>" +
-    "<h4>Install on your phone</h4><p>Open the app link in Chrome, tap the menu and choose <b>Add to Home screen</b> / <b>Install app</b>.</p>" +
-    "<h4>Tip</h4><p>Each screen has its own <b>⋮</b> with help for that screen.</p>" },
-  benefits: { t: "✨ Benefits", h:
-    "<ul><li>No paper registers: attendance with time, location and photo is recorded automatically.</li><li>Works with a weak or no connection; nothing is lost.</li><li>Apply for leave in the app and see the decision on your phone.</li><li>Your dashboard shows your targets and tasks at a glance.</li><li>Management sees the whole team in one place.</li><li>Everything is saved safely in the company Google Sheet.</li></ul>" +
-    "<p style='color:#8A8270;font-size:12px'>More features are added regularly.</p>" },
-  about: { t: "ℹ️ About", h:
-    "<div class='about-line'><b>App:</b> Swastik App</div><div class='about-line'><b>Company:</b> Jay Baba Bakreswar Rice Mill Pvt. Ltd</div><div class='about-line'><b>Version:</b> v2.0</div><div class='about-line'><b>Type:</b> Installable web app (PWA)</div><div class='about-line'><b>Developed by:</b> Ravi Mandal</div>" }
-};
-const TAB_HELP = {
-  attendance: { t: "❓ Attendance", h: "<ul><li>Tap <b>Login</b> to start your day and <b>Logout</b> when you finish.</li><li>Location is captured automatically. If it is not found within 30 seconds, type your area name in the box under the photo. Take a photo if your account requires it.</li><li>No internet? Your entry is saved on the phone and uploaded later.</li><li>If you forget to logout, the session is closed automatically the next day.</li></ul>" },
-  leave: { t: "❓ Leave", h: "<ul><li><b>Apply Leave:</b> choose CL, SL, HD1, HD2 or W/O, pick the dates, add a reason and your WhatsApp number.</li><li>For Sick Leave you can attach photos (optional).</li><li><b>My Requests:</b> shows every request with its status — green Approved, light red Cancel, dark red Not Approved, purple LOP, gold Pending.</li><li>A submitted request cannot be edited in the app. Ask your admin for corrections.</li></ul>" },
-  dashboard: { t: "❓ Dashboard", h: "<ul><li><b>Sales:</b> pick 3, 6 or 12 months to compare sales with target. <b>Party wise</b> shows sales by party for a date range (needs internet).</li><li><b>Office:</b> Weekly Score, leave balance, <b>Weekly Pending</b> tasks and today's <b>Daily Task</b> forms.</li><li>The page shows the last saved data when offline. Tap <b>Refresh</b> for the latest.</li><li>Tap <b>⛶</b> for full screen (it turns the phone view to landscape) and <b>⬇</b> to download the report as an image.</li><li>Admin accounts see the Office Staff / Sales Man overall reports and can open any user's dashboard.</li></ul>" },
-  aatt: { t: "❓ Attendance (Admin)", h: "<ul><li>Opens with <b>today's</b> attendance of everyone.</li><li>Pick a <b>From</b> and <b>To</b> date and tap <b>Show</b> to see any period (up to 3 months).</li><li>Each line shows login and logout time, working hours, and links to the location and photo.</li></ul>" },
-  aleave: { t: "❓ Leave (Admin)", h: "<ul><li>Shows every leave request of every user, newest first, with its current status.</li><li>Green = Approved, light red = Cancel, dark red = Not Approved, purple = LOP, gold = Pending.</li><li>Use the filter to see only one status. Change the status in the Google Sheet (LEAVE tab, column J) and tap Refresh.</li></ul>" },
-  assam: { t: "❓ Assam Sale", h: "<ul><li>Dates of the running month are listed from the 1st to the last day. Sundays are shown in red.</li><li>Enter <b>Qty (Ton)</b> and <b>Amount</b> on an empty line and tap ✓. You can fill any team member's line.</li><li>A saved line cannot be changed from the app.</li><li>Offline entries are uploaded automatically later.</li></ul>" }
-};
+/* The ⋮ help texts, leave types and small settings are NOT in this file. They come from the Sheet after login
+   (login / refresh answer), are kept on the phone and removed again at Sign out. */
+const TAB_KEY = { attendance: "help_attendance", leave: "help_leave", dashboard: "help_dashboard", aatt: "help_admin_attendance", aleave: "help_admin_leave", assam: "help_assam" };
+const leaveTypes = () => (S.details && S.details.leaveTypes) || [];
+const setNum = (k, d) => { const v = Number(S.details && S.details.settings && S.details.settings[k]); return v > 0 ? v : d; };
+const offDays = () => setNum("offline_days", OFFLINE_DAYS);
+const dashStale = () => setNum("dashboard_refresh_minutes", DASH_STALE_MS / 60000) * 60000;
 
 function toggleMenu(ev) {
   ev.stopPropagation();
@@ -1482,7 +1463,7 @@ function toggleMenu(ev) {
 }
 function openInfo(key, tab) {
   $("infoMenu").style.display = "none";
-  const c = tab ? TAB_HELP[key] : INFO[key];
+  const c = ((S.details && S.details.help) || {})[tab ? TAB_KEY[key] : key] || { t: "Help", h: "<p>The help text loads after you log in and are online.</p>" };
   $("infoTitle").textContent = c.t; $("infoBody").innerHTML = c.h;
   $("infoPanel").style.display = "block";
 }
@@ -1503,6 +1484,7 @@ document.addEventListener("click", () => { $("infoMenu").style.display = "none";
   S.dash = (await kvGet("dash")) || null;
   S.leaves = (await kvGet("leaves")) || null;
   S.assam = (await kvGet("assam")) || null;
+  S.details = (await kvGet("details")) || null;
   if ((await outAll()).length) bgSync();
   if (s) { S.session = s; if (await checkGate()) retryGate(); else { show("home"); render(); sync(); if (back === "att") openAtt(); } } else show("login");
   addEventListener("online", () => $("gate").classList.contains("on") ? retryGate() : sync());
